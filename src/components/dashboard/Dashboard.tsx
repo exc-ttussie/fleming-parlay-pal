@@ -123,13 +123,13 @@ export const Dashboard = () => {
     
     const decimalOdds = validLegs.map(leg => leg.decimal_odds);
     const combinedDecimal = parlayDecimal(decimalOdds);
-    const projectedPayout = parlayPayout(currentWeek?.stake_amount || 13000, combinedDecimal);
+    const projectedPayout = parlayPayout(currentWeek?.stake_amount || 1000, combinedDecimal);
     
     return {
       legsCount: validLegs.length,
       combinedDecimal,
       projectedPayout,
-      stake: currentWeek?.stake_amount || 13000
+      stake: currentWeek?.stake_amount || 1000
     };
   };
 
@@ -195,7 +195,7 @@ export const Dashboard = () => {
                 <DollarSign className="w-4 h-4 text-muted-foreground" />
                 <div>
                   <p className="text-sm text-muted-foreground">Stake</p>
-                  <p className="font-medium">{formatCurrency(currentWeek?.stake_amount || 13000)}</p>
+                  <p className="font-medium">{formatCurrency(currentWeek?.stake_amount || 1000)}</p>
                 </div>
               </div>
             </CardContent>
