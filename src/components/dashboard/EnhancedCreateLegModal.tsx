@@ -77,8 +77,22 @@ export const EnhancedCreateLegModal = ({
     try {
       setFetchingOdds(true);
       
+      console.log('Fetching NFL odds...');
+      
       // First, refresh odds from API
-      await supabase.functions.invoke('fetch-odds');
+      const { data: functionData, error: functionError } = await supabase.functions.invoke('fetch-odds');
+      
+      if (functionError) {
+        console.error('Function error:', functionError);
+        toast.error('Failed to refresh odds from API');
+      } else if (functionData) {
+        console.log('Function response:', functionData);
+        if (!functionData.success) {
+          toast.error(functionData.error || 'Failed to fetch odds');
+        } else if (!functionData.api_success) {
+          toast.info('Using backup game data - live odds temporarily unavailable');
+        }
+      }
       
       // Then fetch NFL games from cache (including preseason)
       const { data, error } = await supabase
@@ -87,13 +101,22 @@ export const EnhancedCreateLegModal = ({
         .in('league', ['AMERICANFOOTBALL NFL', 'AMERICANFOOTBALL NFL PRESEASON'])
         .gte('game_date', new Date().toISOString())
         .order('game_date', { ascending: true })
-        .limit(20);
+        .limit(30);
 
-      if (error) throw error;
+      if (error) {
+        console.error('Database error:', error);
+        throw error;
+      }
+      
+      console.log(`Fetched ${data?.length || 0} NFL games from cache`);
       setGames(data || []);
+      
+      if (!data || data.length === 0) {
+        toast.error('No NFL games available. Please try again later or contact support if the issue persists.');
+      }
     } catch (error) {
       console.error('Error fetching games:', error);
-      toast.error('Failed to fetch live odds');
+      toast.error('Failed to fetch NFL games. Please check your connection and try again.');
     } finally {
       setFetchingOdds(false);
     }
