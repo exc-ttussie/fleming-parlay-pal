@@ -12,6 +12,12 @@ import { EnhancedCreateLegModal } from "./EnhancedCreateLegModal";
 
 import type { Leg, Week } from '@/types/database';
 
+interface WeekWithSeason extends Week {
+  seasons?: {
+    label: string;
+  };
+}
+
 interface LegWithProfile extends Leg {
   profiles?: {
     name: string;
@@ -20,7 +26,7 @@ interface LegWithProfile extends Leg {
 
 export const Dashboard = () => {
   const { user } = useAuthContext();
-  const [currentWeek, setCurrentWeek] = useState<Week | null>(null);
+  const [currentWeek, setCurrentWeek] = useState<WeekWithSeason | null>(null);
   const [legs, setLegs] = useState<LegWithProfile[]>([]);
   const [userLeg, setUserLeg] = useState<LegWithProfile | null>(null);
   const [showSubmitModal, setShowSubmitModal] = useState(false);
@@ -28,10 +34,19 @@ export const Dashboard = () => {
 
   const fetchCurrentWeek = async () => {
     try {
+      const now = new Date();
       const { data: weeks, error } = await supabase
         .from('weeks')
-        .select('*')
-        .order('created_at', { ascending: false })
+        .select(`
+          *,
+          seasons:season_id (
+            label
+          )
+        `)
+        .eq('status', 'OPEN')
+        .lte('opens_at', now.toISOString())
+        .gte('locks_at', now.toISOString())
+        .order('opens_at', { ascending: false })
         .limit(1);
 
       if (error) throw error;
@@ -138,7 +153,9 @@ export const Dashboard = () => {
         <div className="flex items-center justify-between">
           <div>
             <h1 className="text-3xl font-bold text-foreground">Fleming Parlay Coordinator</h1>
-            <p className="text-muted-foreground">NFL 2024 - Week {currentWeek?.week_number}</p>
+            <p className="text-muted-foreground">
+              {currentWeek?.seasons?.label} - Week {currentWeek?.week_number}
+            </p>
           </div>
           <Button variant="outline" onClick={() => signOut()}>
             <LogOut className="w-4 h-4 mr-2" />
