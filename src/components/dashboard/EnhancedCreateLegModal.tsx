@@ -228,8 +228,8 @@ export const EnhancedCreateLegModal = ({
       <DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto">
         <DialogHeader className="flex flex-row items-center justify-between">
           <DialogTitle className="flex items-center gap-2">
-            <TrendingUp className="h-5 w-5" />
-            NFL Betting - Live DraftKings Odds
+            <TrendingUp className="h-5 w-5 text-primary" />
+            <span className="text-primary font-bold">LET THE DEED SHAW</span> - NFL Betting
           </DialogTitle>
           <Button
             variant="ghost"
