@@ -173,9 +173,6 @@ export const Dashboard = () => {
         <div className="flex items-center justify-between">
           <div>
             <h1 className="text-3xl font-bold text-foreground">Fleming Parlay Coordinator</h1>
-            <p className="text-muted-foreground">
-              {currentWeek?.seasons?.label} - Week {currentWeek?.week_number}
-            </p>
           </div>
           <Button variant="outline" onClick={() => signOut()}>
             <LogOut className="w-4 h-4 mr-2" />
