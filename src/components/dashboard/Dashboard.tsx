@@ -60,7 +60,7 @@ export const Dashboard = () => {
       // Then fetch profiles for the users
       const userIds = legsData?.map(leg => leg.user_id) || [];
       const { data: profilesData, error: profilesError } = await supabase
-        .from('profiles')
+        .from('safe_profiles')
         .select('user_id, name')
         .in('user_id', userIds);
 

@@ -9,7 +9,7 @@ import { Users, Clock, Target, TrendingUp } from 'lucide-react';
 import { formatCurrency, parlayDecimal, parlayPayout } from '@/lib/parlay';
 
 interface LegWithProfile extends Leg {
-  profiles?: { name: string; team_name?: string } | null;
+  safe_profiles?: { name: string; team_name?: string } | null;
 }
 
 export const GroupCoordination = () => {
@@ -42,7 +42,7 @@ export const GroupCoordination = () => {
         .from('legs')
         .select(`
           *,
-          profiles:user_id (name, team_name)
+          safe_profiles:user_id (name, team_name)
         `)
         .eq('week_id', weekId)
         .order('created_at', { ascending: true });
@@ -200,14 +200,14 @@ export const GroupCoordination = () => {
               <div key={leg.id} className="flex items-center justify-between p-3 bg-muted rounded-md">
                 <div className="flex items-center gap-3">
                   <div>
-                    <p className="font-medium">
-                      {leg.profiles?.name || 'Unknown User'}
-                      {leg.profiles?.team_name && (
-                        <span className="text-sm text-muted-foreground ml-2">
-                          ({leg.profiles.team_name})
-                        </span>
-                      )}
-                    </p>
+                     <p className="font-medium">
+                       {leg.safe_profiles?.name || 'Unknown User'}
+                       {leg.safe_profiles?.team_name && (
+                         <span className="text-sm text-muted-foreground ml-2">
+                           ({leg.safe_profiles.team_name})
+                         </span>
+                       )}
+                     </p>
                     <p className="text-sm text-muted-foreground">{leg.game_desc}</p>
                   </div>
                 </div>
