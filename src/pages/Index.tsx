@@ -1,11 +1,17 @@
 import { LoginPage } from "@/components/auth/LoginPage";
 import { Dashboard } from "@/components/dashboard/Dashboard";
+import { AdminDashboard } from "@/pages/AdminDashboard";
+import { GroupCoordination } from "@/components/group/GroupCoordination";
 import { useAuthContext } from "@/components/AuthProvider";
+import { useUserRole } from "@/hooks/useUserRole";
+import AppLayout from "@/components/layout/AppLayout";
+import { Routes, Route } from "react-router-dom";
 
 const Index = () => {
   const { user, loading } = useAuthContext();
+  const { isAdmin, loading: roleLoading } = useUserRole();
 
-  if (loading) {
+  if (loading || roleLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
         <div className="text-center">
@@ -20,7 +26,15 @@ const Index = () => {
     return <LoginPage />;
   }
 
-  return <Dashboard />;
+  return (
+    <AppLayout>
+      <Routes>
+        <Route path="/" element={isAdmin ? <GroupCoordination /> : <Dashboard />} />
+        <Route path="/admin/*" element={<AdminDashboard />} />
+        <Route path="/group" element={<GroupCoordination />} />
+      </Routes>
+    </AppLayout>
+  );
 };
 
 export default Index;

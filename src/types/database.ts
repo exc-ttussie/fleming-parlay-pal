@@ -53,7 +53,7 @@ export interface Profile {
   name: string;
   email: string;
   team_name?: string;
-  role: 'MEMBER' | 'ADMIN';
+  role: 'MEMBER' | 'COMMISSIONER';
   created_at: string;
   updated_at: string;
 }
