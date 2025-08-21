@@ -7,10 +7,11 @@ const corsHeaders = {
 };
 
 const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
-const supabaseAnonKey = Deno.env.get('SUPABASE_ANON_KEY')!;
+const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
 const oddsApiKey = Deno.env.get('ODDS_API_KEY')!;
 
-const supabase = createClient(supabaseUrl, supabaseAnonKey);
+// Use service role key for database writes (bypasses RLS)
+const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
 interface OddsResponse {
   id: string;
@@ -90,6 +91,7 @@ const handler = async (req: Request): Promise<Response> => {
     
     let allGames: any[] = [];
     let apiSuccess = false;
+    let apiRateLimit = { requests_remaining: null, requests_used: null };
     
     for (const sport of sports) {
       try {
@@ -101,6 +103,12 @@ const handler = async (req: Request): Promise<Response> => {
         const response = await fetch(apiUrl);
         
         console.log(`API Response status for ${sport}:`, response.status);
+        
+        // Extract rate limit headers
+        const remainingRequests = response.headers.get('x-requests-remaining');
+        const usedRequests = response.headers.get('x-requests-used');
+        if (remainingRequests) apiRateLimit.requests_remaining = parseInt(remainingRequests);
+        if (usedRequests) apiRateLimit.requests_used = parseInt(usedRequests);
         
         if (!response.ok) {
           const errorText = await response.text();
@@ -229,6 +237,7 @@ const handler = async (req: Request): Promise<Response> => {
         success: true, 
         games_processed: allGames.length,
         api_success: apiSuccess,
+        rate_limit: apiRateLimit,
         message: apiSuccess ? 'Live NFL odds fetched successfully' : 'Using fallback NFL games (API unavailable)' 
       }),
       {

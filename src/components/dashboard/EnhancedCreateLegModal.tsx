@@ -91,6 +91,8 @@ export const EnhancedCreateLegModal = ({
           toast.error(functionData.error || 'Failed to fetch odds');
         } else if (!functionData.api_success) {
           toast.info('Using backup game data - live odds temporarily unavailable');
+        } else if (functionData.rate_limit?.requests_remaining !== null) {
+          console.log(`API requests remaining: ${functionData.rate_limit.requests_remaining}`);
         }
       }
       
