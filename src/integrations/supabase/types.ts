@@ -307,7 +307,24 @@ export type Database = {
       }
     }
     Views: {
-      [_ in never]: never
+      safe_profiles: {
+        Row: {
+          name: string | null
+          team_name: string | null
+          user_id: string | null
+        }
+        Insert: {
+          name?: string | null
+          team_name?: string | null
+          user_id?: string | null
+        }
+        Update: {
+          name?: string | null
+          team_name?: string | null
+          user_id?: string | null
+        }
+        Relationships: []
+      }
     }
     Functions: {
       [_ in never]: never
