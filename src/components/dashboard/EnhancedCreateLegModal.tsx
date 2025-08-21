@@ -1,0 +1,399 @@
+import { useState, useEffect } from 'react';
+import { useAuthContext } from '@/components/AuthProvider';
+import { supabase } from '@/integrations/supabase/client';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
+import { Button } from '@/components/ui/button';
+import { Label } from '@/components/ui/label';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import { Card, CardContent } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
+import { Separator } from '@/components/ui/separator';
+import { toast } from 'sonner';
+import { Loader2, RefreshCw, TrendingUp } from 'lucide-react';
+import { americanToDecimal } from '@/lib/parlay';
+
+interface Game {
+  id: string;
+  external_game_id: string;
+  sport: string;
+  league: string;
+  game_date: string;
+  team_a: string;
+  team_b: string;
+  moneyline_home: number | null;
+  moneyline_away: number | null;
+  spread_home: number | null;
+  spread_home_odds: number | null;
+  spread_away: number | null;
+  spread_away_odds: number | null;
+  total_over: number | null;
+  total_over_odds: number | null;
+  total_under: number | null;
+  total_under_odds: number | null;
+  updated_at: string;
+}
+
+interface BetOption {
+  type: 'moneyline' | 'spread' | 'total';
+  selection: string;
+  odds: number;
+  line?: number;
+  description: string;
+}
+
+interface EnhancedCreateLegModalProps {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  onLegCreated: () => void;
+  weekId: string;
+}
+
+export const EnhancedCreateLegModal = ({ 
+  open, 
+  onOpenChange, 
+  onLegCreated,
+  weekId 
+}: EnhancedCreateLegModalProps) => {
+  const { user } = useAuthContext();
+  const [loading, setLoading] = useState(false);
+  const [fetchingOdds, setFetchingOdds] = useState(false);
+  const [games, setGames] = useState<Game[]>([]);
+  const [selectedGame, setSelectedGame] = useState<Game | null>(null);
+  const [selectedBet, setSelectedBet] = useState<BetOption | null>(null);
+  const [sportFilter, setSportFilter] = useState<string>('all');
+
+  // Fetch available games
+  const fetchGames = async () => {
+    try {
+      setFetchingOdds(true);
+      
+      // First, refresh odds from API
+      await supabase.functions.invoke('fetch-odds');
+      
+      // Then fetch from cache
+      const { data, error } = await supabase
+        .from('odds_cache')
+        .select('*')
+        .gte('game_date', new Date().toISOString())
+        .order('game_date', { ascending: true })
+        .limit(50);
+
+      if (error) throw error;
+      setGames(data || []);
+    } catch (error) {
+      console.error('Error fetching games:', error);
+      toast.error('Failed to fetch live odds');
+    } finally {
+      setFetchingOdds(false);
+    }
+  };
+
+  useEffect(() => {
+    if (open) {
+      fetchGames();
+    }
+  }, [open]);
+
+  // Get available bet options for selected game
+  const getBetOptions = (game: Game): BetOption[] => {
+    const options: BetOption[] = [];
+
+    // Moneyline options
+    if (game.moneyline_home) {
+      options.push({
+        type: 'moneyline',
+        selection: `${game.team_a} ML`,
+        odds: game.moneyline_home,
+        description: `${game.team_a} to win`
+      });
+    }
+    if (game.moneyline_away) {
+      options.push({
+        type: 'moneyline',
+        selection: `${game.team_b} ML`,
+        odds: game.moneyline_away,
+        description: `${game.team_b} to win`
+      });
+    }
+
+    // Spread options
+    if (game.spread_home && game.spread_home_odds) {
+      const spread = game.spread_home > 0 ? `+${game.spread_home}` : game.spread_home;
+      options.push({
+        type: 'spread',
+        selection: `${game.team_a} ${spread}`,
+        odds: game.spread_home_odds,
+        line: game.spread_home,
+        description: `${game.team_a} ${spread}`
+      });
+    }
+    if (game.spread_away && game.spread_away_odds) {
+      const spread = game.spread_away > 0 ? `+${game.spread_away}` : game.spread_away;
+      options.push({
+        type: 'spread',
+        selection: `${game.team_b} ${spread}`,
+        odds: game.spread_away_odds,
+        line: game.spread_away,
+        description: `${game.team_b} ${spread}`
+      });
+    }
+
+    // Total options
+    if (game.total_over && game.total_over_odds) {
+      options.push({
+        type: 'total',
+        selection: `Over ${game.total_over}`,
+        odds: game.total_over_odds,
+        line: game.total_over,
+        description: `Over ${game.total_over} total points`
+      });
+    }
+    if (game.total_under && game.total_under_odds) {
+      options.push({
+        type: 'total',
+        selection: `Under ${game.total_under}`,
+        odds: game.total_under_odds,
+        line: game.total_under,
+        description: `Under ${game.total_under} total points`
+      });
+    }
+
+    return options;
+  };
+
+  const handleSubmitLeg = async () => {
+    if (!user || !selectedGame || !selectedBet) {
+      toast.error('Please select a game and bet');
+      return;
+    }
+
+    setLoading(true);
+    
+    try {
+      const decimalOdds = americanToDecimal(selectedBet.odds);
+
+      const { error } = await supabase
+        .from('legs')
+        .insert({
+          user_id: user.id,
+          week_id: weekId,
+          sport_key: selectedGame.sport.toLowerCase().replace(' ', '_'),
+          league: selectedGame.league,
+          game_id: selectedGame.external_game_id,
+          game_desc: `${selectedGame.team_a} vs ${selectedGame.team_b}`,
+          market_key: selectedBet.type,
+          selection: selectedBet.selection,
+          line: selectedBet.line,
+          american_odds: selectedBet.odds,
+          decimal_odds: decimalOdds,
+          source: 'odds_api',
+          bookmaker: 'DraftKings',
+          status: 'PENDING'
+        });
+
+      if (error) throw error;
+
+      toast.success('Leg submitted successfully!');
+      onLegCreated();
+      onOpenChange(false);
+      
+      // Reset selections
+      setSelectedGame(null);
+      setSelectedBet(null);
+      
+    } catch (error: any) {
+      console.error('Error creating leg:', error);
+      toast.error('Failed to submit leg');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const filteredGames = sportFilter === 'all' 
+    ? games 
+    : games.filter(game => game.sport.toLowerCase().includes(sportFilter.toLowerCase()));
+
+  const uniqueSports = [...new Set(games.map(game => game.sport))];
+
+  const formatOdds = (odds: number) => odds > 0 ? `+${odds}` : `${odds}`;
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto">
+        <DialogHeader className="flex flex-row items-center justify-between">
+          <DialogTitle className="flex items-center gap-2">
+            <TrendingUp className="h-5 w-5" />
+            Place Your Bet - Live DraftKings Odds
+          </DialogTitle>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={fetchGames}
+            disabled={fetchingOdds}
+            className="flex items-center gap-2"
+          >
+            <RefreshCw className={`h-4 w-4 ${fetchingOdds ? 'animate-spin' : ''}`} />
+            Refresh Odds
+          </Button>
+        </DialogHeader>
+        
+        {fetchingOdds ? (
+          <div className="flex items-center justify-center py-8">
+            <Loader2 className="h-8 w-8 animate-spin" />
+            <span className="ml-2">Fetching live odds...</span>
+          </div>
+        ) : (
+          <div className="space-y-6">
+            {/* Sport Filter */}
+            <div className="flex items-center gap-4">
+              <Label>Filter by Sport:</Label>
+              <Select value={sportFilter} onValueChange={setSportFilter}>
+                <SelectTrigger className="w-48">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Sports</SelectItem>
+                  {uniqueSports.map((sport) => (
+                    <SelectItem key={sport} value={sport}>
+                      {sport}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            {/* Game Selection */}
+            <div className="space-y-4">
+              <h3 className="text-lg font-semibold">Select a Game</h3>
+              <div className="grid gap-3 max-h-60 overflow-y-auto">
+                {filteredGames.map((game) => (
+                  <Card 
+                    key={game.id}
+                    className={`cursor-pointer transition-colors ${
+                      selectedGame?.id === game.id ? 'ring-2 ring-primary bg-accent' : 'hover:bg-accent/50'
+                    }`}
+                    onClick={() => setSelectedGame(game)}
+                  >
+                    <CardContent className="p-4">
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <div className="font-semibold">
+                            {game.team_a} vs {game.team_b}
+                          </div>
+                          <div className="text-sm text-muted-foreground">
+                            {game.league} • {new Date(game.game_date).toLocaleDateString()} at{' '}
+                            {new Date(game.game_date).toLocaleTimeString([], { 
+                              hour: '2-digit', 
+                              minute: '2-digit' 
+                            })}
+                          </div>
+                        </div>
+                        <Badge variant="secondary">{game.sport}</Badge>
+                      </div>
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+            </div>
+
+            {/* Bet Options */}
+            {selectedGame && (
+              <div className="space-y-4">
+                <Separator />
+                <h3 className="text-lg font-semibold">Available Bets</h3>
+                <div className="grid gap-3">
+                  {getBetOptions(selectedGame).map((bet, index) => (
+                    <Card
+                      key={index}
+                      className={`cursor-pointer transition-colors ${
+                        selectedBet === bet ? 'ring-2 ring-primary bg-accent' : 'hover:bg-accent/50'
+                      }`}
+                      onClick={() => setSelectedBet(bet)}
+                    >
+                      <CardContent className="p-4">
+                        <div className="flex items-center justify-between">
+                          <div>
+                            <div className="font-medium">{bet.description}</div>
+                            <div className="text-sm text-muted-foreground capitalize">
+                              {bet.type} bet
+                            </div>
+                          </div>
+                          <div className="text-right">
+                            <div className="font-semibold text-lg">
+                              {formatOdds(bet.odds)}
+                            </div>
+                            <Badge variant="outline" className="text-xs">
+                              DraftKings
+                            </Badge>
+                          </div>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Selection Summary */}
+            {selectedGame && selectedBet && (
+              <div className="space-y-4">
+                <Separator />
+                <div className="bg-muted/50 rounded-lg p-4">
+                  <h4 className="font-semibold mb-2">Your Selection</h4>
+                  <div className="space-y-2 text-sm">
+                    <div>
+                      <span className="font-medium">Game:</span> {selectedGame.team_a} vs {selectedGame.team_b}
+                    </div>
+                    <div>
+                      <span className="font-medium">Bet:</span> {selectedBet.description}
+                    </div>
+                    <div>
+                      <span className="font-medium">Odds:</span> {formatOdds(selectedBet.odds)}
+                    </div>
+                    <div>
+                      <span className="font-medium">Stake:</span> $10.00 (group parlay)
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Submit Button */}
+            <div className="flex justify-end gap-3 pt-4">
+              <Button
+                variant="outline"
+                onClick={() => onOpenChange(false)}
+              >
+                Cancel
+              </Button>
+              <Button 
+                onClick={handleSubmitLeg}
+                disabled={loading || !selectedGame || !selectedBet}
+              >
+                {loading ? (
+                  <>
+                    <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                    Submitting...
+                  </>
+                ) : (
+                  'Submit Leg'
+                )}
+              </Button>
+            </div>
+          </div>
+        )}
+      </DialogContent>
+    </Dialog>
+  );
+};

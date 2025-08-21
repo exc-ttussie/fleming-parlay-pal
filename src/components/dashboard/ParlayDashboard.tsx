@@ -6,7 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { PlusCircle, BarChart3, TrendingUp } from 'lucide-react';
-import { CreateLegModal } from './CreateLegModal';
+import { EnhancedCreateLegModal } from './EnhancedCreateLegModal';
 import { SimpleParlayBuilder } from './SimpleParlayBuilder';
 import { LegsTable } from './LegsTable';
 import { toast } from '@/hooks/use-toast';
@@ -17,7 +17,7 @@ export const ParlayDashboard = () => {
   const { user } = useAuth();
   const [legs, setLegs] = useState<Leg[]>([]);
   const [parlays, setParlays] = useState<(Parlay & { legs: Leg[] })[]>([]);
-  const [isCreateLegOpen, setIsCreateLegOpen] = useState(false);
+  const [showCreateModal, setShowCreateModal] = useState(false);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState('legs');
 
@@ -71,7 +71,7 @@ export const ParlayDashboard = () => {
 
   const handleLegCreated = () => {
     fetchData();
-    setIsCreateLegOpen(false);
+    setShowCreateModal(false);
     toast({
       title: "Success",
       description: "Leg created successfully",
@@ -126,7 +126,7 @@ export const ParlayDashboard = () => {
             <TrendingUp className="h-4 w-4 mr-2" />
             Fetch Latest Odds
           </Button>
-          <Button onClick={() => setIsCreateLegOpen(true)}>
+          <Button onClick={() => setShowCreateModal(true)}>
             <PlusCircle className="h-4 w-4 mr-2" />
             Add Leg
           </Button>
@@ -264,10 +264,11 @@ export const ParlayDashboard = () => {
         </TabsContent>
       </Tabs>
 
-      <CreateLegModal
-        open={isCreateLegOpen}
-        onOpenChange={setIsCreateLegOpen}
+      <EnhancedCreateLegModal
+        open={showCreateModal}
+        onOpenChange={setShowCreateModal}
         onLegCreated={handleLegCreated}
+        weekId="sample-week-id" // TODO: Get current week ID from context
       />
     </div>
   );

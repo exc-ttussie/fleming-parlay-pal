@@ -85,6 +85,72 @@ export type Database = {
           },
         ]
       }
+      odds_cache: {
+        Row: {
+          created_at: string
+          external_game_id: string
+          game_date: string
+          id: string
+          league: string
+          moneyline_away: number | null
+          moneyline_home: number | null
+          sport: string
+          spread_away: number | null
+          spread_away_odds: number | null
+          spread_home: number | null
+          spread_home_odds: number | null
+          team_a: string
+          team_b: string
+          total_over: number | null
+          total_over_odds: number | null
+          total_under: number | null
+          total_under_odds: number | null
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          external_game_id: string
+          game_date: string
+          id?: string
+          league: string
+          moneyline_away?: number | null
+          moneyline_home?: number | null
+          sport: string
+          spread_away?: number | null
+          spread_away_odds?: number | null
+          spread_home?: number | null
+          spread_home_odds?: number | null
+          team_a: string
+          team_b: string
+          total_over?: number | null
+          total_over_odds?: number | null
+          total_under?: number | null
+          total_under_odds?: number | null
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          external_game_id?: string
+          game_date?: string
+          id?: string
+          league?: string
+          moneyline_away?: number | null
+          moneyline_home?: number | null
+          sport?: string
+          spread_away?: number | null
+          spread_away_odds?: number | null
+          spread_home?: number | null
+          spread_home_odds?: number | null
+          team_a?: string
+          team_b?: string
+          total_over?: number | null
+          total_over_odds?: number | null
+          total_under?: number | null
+          total_under_odds?: number | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
       parlays: {
         Row: {
           combined_american: number

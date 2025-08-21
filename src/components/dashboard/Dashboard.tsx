@@ -8,7 +8,7 @@ import { signOut } from "@/lib/auth";
 import { formatCurrency, americanToDecimal, parlayDecimal, parlayPayout } from "@/lib/parlay";
 import { Clock, Users, DollarSign, TrendingUp, LogOut } from "lucide-react";
 import { LegsTable } from "./LegsTable";
-import { SubmitLegModal } from "./SubmitLegModal";
+import { EnhancedCreateLegModal } from "./EnhancedCreateLegModal";
 
 import type { Leg, Week } from '@/types/database';
 
@@ -273,14 +273,11 @@ export const Dashboard = () => {
 
       {/* Submit Modal */}
       {showSubmitModal && currentWeek && (
-        <SubmitLegModal
+        <EnhancedCreateLegModal
           open={showSubmitModal}
-          onClose={() => setShowSubmitModal(false)}
+          onOpenChange={setShowSubmitModal}
+          onLegCreated={fetchCurrentWeek}
           weekId={currentWeek.id}
-          onSuccess={() => {
-            setShowSubmitModal(false);
-            fetchCurrentWeek();
-          }}
         />
       )}
     </div>
