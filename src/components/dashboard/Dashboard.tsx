@@ -35,7 +35,9 @@ export const Dashboard = () => {
   const fetchCurrentWeek = async () => {
     try {
       const now = new Date();
-      const { data: weeks, error } = await supabase
+      
+      // First try to find a week that matches current time constraints
+      let { data: weeks, error } = await supabase
         .from('weeks')
         .select(`
           *,
@@ -45,11 +47,29 @@ export const Dashboard = () => {
         `)
         .eq('status', 'OPEN')
         .lte('opens_at', now.toISOString())
-        .gte('locks_at', now.toISOString())
+        .gt('locks_at', now.toISOString())
         .order('opens_at', { ascending: false })
         .limit(1);
 
       if (error) throw error;
+      
+      // If no current week found, fall back to most recent OPEN week (for development)
+      if (!weeks || weeks.length === 0) {
+        const { data: fallbackWeeks, error: fallbackError } = await supabase
+          .from('weeks')
+          .select(`
+            *,
+            seasons:season_id (
+              label
+            )
+          `)
+          .eq('status', 'OPEN')
+          .order('opens_at', { ascending: false })
+          .limit(1);
+
+        if (fallbackError) throw fallbackError;
+        weeks = fallbackWeeks;
+      }
       
       if (weeks && weeks.length > 0) {
         setCurrentWeek(weeks[0]);
