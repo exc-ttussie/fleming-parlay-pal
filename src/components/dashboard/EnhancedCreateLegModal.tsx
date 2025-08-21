@@ -80,11 +80,11 @@ export const EnhancedCreateLegModal = ({
       // First, refresh odds from API
       await supabase.functions.invoke('fetch-odds');
       
-      // Then fetch NFL games from cache
+      // Then fetch NFL games from cache (including preseason)
       const { data, error } = await supabase
         .from('odds_cache')
         .select('*')
-        .eq('sport', 'American Football')
+        .in('league', ['AMERICANFOOTBALL NFL', 'AMERICANFOOTBALL NFL PRESEASON'])
         .gte('game_date', new Date().toISOString())
         .order('game_date', { ascending: true })
         .limit(20);

@@ -41,8 +41,8 @@ const handler = async (req: Request): Promise<Response> => {
   try {
     console.log('Starting odds fetch...');
     
-    // Fetch odds from multiple sports
-    const sports = ['americanfootball_nfl', 'basketball_nba', 'baseball_mlb', 'icehockey_nhl'];
+    // Fetch odds from multiple sports (including NFL preseason)
+    const sports = ['americanfootball_nfl', 'americanfootball_nfl_preseason', 'basketball_nba', 'baseball_mlb', 'icehockey_nhl'];
     const markets = 'h2h,spreads,totals';
     
     let allGames: any[] = [];
