@@ -14,7 +14,231 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      legs: {
+        Row: {
+          american_odds: number
+          bookmaker: string
+          created_at: string
+          decimal_odds: number
+          game_desc: string
+          game_id: string | null
+          id: string
+          league: string
+          line: number | null
+          market_key: string
+          notes: string | null
+          selection: string
+          source: string
+          sport_key: string
+          status: Database["public"]["Enums"]["leg_status"]
+          updated_at: string
+          user_id: string
+          week_id: string
+        }
+        Insert: {
+          american_odds: number
+          bookmaker: string
+          created_at?: string
+          decimal_odds: number
+          game_desc: string
+          game_id?: string | null
+          id?: string
+          league: string
+          line?: number | null
+          market_key: string
+          notes?: string | null
+          selection: string
+          source: string
+          sport_key: string
+          status?: Database["public"]["Enums"]["leg_status"]
+          updated_at?: string
+          user_id: string
+          week_id: string
+        }
+        Update: {
+          american_odds?: number
+          bookmaker?: string
+          created_at?: string
+          decimal_odds?: number
+          game_desc?: string
+          game_id?: string | null
+          id?: string
+          league?: string
+          line?: number | null
+          market_key?: string
+          notes?: string | null
+          selection?: string
+          source?: string
+          sport_key?: string
+          status?: Database["public"]["Enums"]["leg_status"]
+          updated_at?: string
+          user_id?: string
+          week_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "legs_week_id_fkey"
+            columns: ["week_id"]
+            isOneToOne: false
+            referencedRelation: "weeks"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      parlays: {
+        Row: {
+          combined_american: number
+          combined_decimal: number
+          created_at: string
+          id: string
+          legs_count: number
+          projected_payout: number
+          stake_amount: number
+          summary_json: Json
+          updated_at: string
+          week_id: string
+        }
+        Insert: {
+          combined_american: number
+          combined_decimal: number
+          created_at?: string
+          id?: string
+          legs_count: number
+          projected_payout: number
+          stake_amount: number
+          summary_json: Json
+          updated_at?: string
+          week_id: string
+        }
+        Update: {
+          combined_american?: number
+          combined_decimal?: number
+          created_at?: string
+          id?: string
+          legs_count?: number
+          projected_payout?: number
+          stake_amount?: number
+          summary_json?: Json
+          updated_at?: string
+          week_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "parlays_week_id_fkey"
+            columns: ["week_id"]
+            isOneToOne: true
+            referencedRelation: "weeks"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      profiles: {
+        Row: {
+          created_at: string
+          email: string
+          id: string
+          name: string
+          role: Database["public"]["Enums"]["app_role"]
+          team_name: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          email: string
+          id?: string
+          name: string
+          role?: Database["public"]["Enums"]["app_role"]
+          team_name?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          email?: string
+          id?: string
+          name?: string
+          role?: Database["public"]["Enums"]["app_role"]
+          team_name?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      seasons: {
+        Row: {
+          created_at: string
+          end_date: string
+          id: string
+          label: string
+          league: string
+          start_date: string
+        }
+        Insert: {
+          created_at?: string
+          end_date: string
+          id?: string
+          label: string
+          league: string
+          start_date: string
+        }
+        Update: {
+          created_at?: string
+          end_date?: string
+          id?: string
+          label?: string
+          league?: string
+          start_date?: string
+        }
+        Relationships: []
+      }
+      weeks: {
+        Row: {
+          created_at: string
+          finalized_at: string | null
+          id: string
+          locks_at: string
+          opens_at: string
+          season_id: string
+          stake_amount: number
+          status: Database["public"]["Enums"]["week_status"]
+          updated_at: string
+          week_number: number
+        }
+        Insert: {
+          created_at?: string
+          finalized_at?: string | null
+          id?: string
+          locks_at: string
+          opens_at: string
+          season_id: string
+          stake_amount?: number
+          status?: Database["public"]["Enums"]["week_status"]
+          updated_at?: string
+          week_number: number
+        }
+        Update: {
+          created_at?: string
+          finalized_at?: string | null
+          id?: string
+          locks_at?: string
+          opens_at?: string
+          season_id?: string
+          stake_amount?: number
+          status?: Database["public"]["Enums"]["week_status"]
+          updated_at?: string
+          week_number?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "weeks_season_id_fkey"
+            columns: ["season_id"]
+            isOneToOne: false
+            referencedRelation: "seasons"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       [_ in never]: never
@@ -23,7 +247,9 @@ export type Database = {
       [_ in never]: never
     }
     Enums: {
-      [_ in never]: never
+      app_role: "MEMBER" | "COMMISSIONER"
+      leg_status: "PENDING" | "OK" | "DUPLICATE" | "CONFLICT" | "REJECTED"
+      week_status: "OPEN" | "LOCKED" | "FINALIZED"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -150,6 +376,10 @@ export type CompositeTypes<
 
 export const Constants = {
   public: {
-    Enums: {},
+    Enums: {
+      app_role: ["MEMBER", "COMMISSIONER"],
+      leg_status: ["PENDING", "OK", "DUPLICATE", "CONFLICT", "REJECTED"],
+      week_status: ["OPEN", "LOCKED", "FINALIZED"],
+    },
   },
 } as const
