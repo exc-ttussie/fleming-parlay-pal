@@ -10,25 +10,9 @@ import { Clock, Users, DollarSign, TrendingUp, LogOut } from "lucide-react";
 import { LegsTable } from "./LegsTable";
 import { SubmitLegModal } from "./SubmitLegModal";
 
-interface Week {
-  id: string;
-  week_number: number;
-  status: 'OPEN' | 'LOCKED' | 'FINALIZED';
-  locks_at: string;
-  stake_amount: number;
-}
+import type { Leg, Week } from '@/types/database';
 
-interface Leg {
-  id: string;
-  user_id: string;
-  game_desc: string;
-  market_key: string;
-  selection: string;
-  line: number | null;
-  american_odds: number;
-  decimal_odds: number;
-  source: string;
-  status: 'PENDING' | 'OK' | 'DUPLICATE' | 'CONFLICT' | 'REJECTED';
+interface LegWithProfile extends Leg {
   profiles?: {
     name: string;
   };
@@ -37,8 +21,8 @@ interface Leg {
 export const Dashboard = () => {
   const { user } = useAuthContext();
   const [currentWeek, setCurrentWeek] = useState<Week | null>(null);
-  const [legs, setLegs] = useState<Leg[]>([]);
-  const [userLeg, setUserLeg] = useState<Leg | null>(null);
+  const [legs, setLegs] = useState<LegWithProfile[]>([]);
+  const [userLeg, setUserLeg] = useState<LegWithProfile | null>(null);
   const [showSubmitModal, setShowSubmitModal] = useState(false);
   const [loading, setLoading] = useState(true);
 
@@ -253,7 +237,7 @@ export const Dashboard = () => {
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <LegsTable legs={legs} />
+            <LegsTable legs={legs} onRefresh={fetchCurrentWeek} />
           </CardContent>
         </Card>
 

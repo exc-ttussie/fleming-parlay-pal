@@ -11,44 +11,12 @@ import { SimpleParlayBuilder } from './SimpleParlayBuilder';
 import { LegsTable } from './LegsTable';
 import { toast } from '@/hooks/use-toast';
 
-interface Leg {
-  id: string;
-  week_id: string;
-  user_id: string;
-  sport_key: string;
-  league: string;
-  game_id?: string;
-  game_desc: string;
-  market_key: string;
-  selection: string;
-  line?: number;
-  american_odds: number;
-  decimal_odds: number;
-  source: string;
-  bookmaker: string;
-  notes?: string;
-  status: string;
-  created_at: string;
-  updated_at: string;
-}
-
-interface Parlay {
-  id: string;
-  legs_count: number;
-  stake_amount: number;
-  projected_payout: number;
-  combined_american: number;
-  combined_decimal: number;
-  summary_json: any;
-  week_id: string;
-  created_at: string;
-  legs: Leg[];
-}
+import type { Leg, Parlay } from '@/types/database';
 
 export const ParlayDashboard = () => {
   const { user } = useAuth();
   const [legs, setLegs] = useState<Leg[]>([]);
-  const [parlays, setParlays] = useState<Parlay[]>([]);
+  const [parlays, setParlays] = useState<(Parlay & { legs: Leg[] })[]>([]);
   const [isCreateLegOpen, setIsCreateLegOpen] = useState(false);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState('legs');
@@ -82,9 +50,9 @@ export const ParlayDashboard = () => {
       if (parlaysError) throw parlaysError;
       
       // For now, set empty legs array since we need to understand the relationship
-      const transformedParlays = parlaysData?.map(parlay => ({
+      const transformedParlays = parlaysData?.map((parlay: Parlay) => ({
         ...parlay,
-        legs: []
+        legs: [] as Leg[]
       })) || [];
       
       setParlays(transformedParlays);
@@ -145,8 +113,8 @@ export const ParlayDashboard = () => {
   }
 
   const activeParlays = parlays; // All parlays for now
-  const completedParlays: Parlay[] = []; // Empty for now
-  const pendingLegs = legs; // All legs for now
+  const completedParlays: (Parlay & { legs: Leg[] })[] = []; // Empty for now
+  const pendingLegs = legs.filter(leg => leg.status === 'PENDING'); // Filter pending legs
   const totalStake = parlays.reduce((sum, parlay) => sum + parlay.stake_amount, 0);
 
   return (

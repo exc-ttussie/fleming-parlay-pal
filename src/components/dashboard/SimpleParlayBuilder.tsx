@@ -9,26 +9,7 @@ import { Separator } from '@/components/ui/separator';
 import { X, Calculator } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
 
-interface Leg {
-  id: string;
-  week_id: string;
-  user_id: string;
-  sport_key: string;
-  league: string;
-  game_id?: string;
-  game_desc: string;
-  market_key: string;
-  selection: string;
-  line?: number;
-  american_odds: number;
-  decimal_odds: number;
-  source: string;
-  bookmaker: string;
-  notes?: string;
-  status: string;
-  created_at: string;
-  updated_at: string;
-}
+import type { Leg } from '@/types/database';
 
 interface SimpleParlayBuilderProps {
   legs: Leg[];
