@@ -71,7 +71,6 @@ export const EnhancedCreateLegModal = ({
   const [games, setGames] = useState<Game[]>([]);
   const [selectedGame, setSelectedGame] = useState<Game | null>(null);
   const [selectedBet, setSelectedBet] = useState<BetOption | null>(null);
-  const [sportFilter, setSportFilter] = useState<string>('all');
 
   // Fetch available games
   const fetchGames = async () => {
@@ -81,13 +80,14 @@ export const EnhancedCreateLegModal = ({
       // First, refresh odds from API
       await supabase.functions.invoke('fetch-odds');
       
-      // Then fetch from cache
+      // Then fetch NFL games from cache
       const { data, error } = await supabase
         .from('odds_cache')
         .select('*')
+        .eq('sport', 'American Football')
         .gte('game_date', new Date().toISOString())
         .order('game_date', { ascending: true })
-        .limit(50);
+        .limit(20);
 
       if (error) throw error;
       setGames(data || []);
@@ -220,11 +220,6 @@ export const EnhancedCreateLegModal = ({
     }
   };
 
-  const filteredGames = sportFilter === 'all' 
-    ? games 
-    : games.filter(game => game.sport.toLowerCase().includes(sportFilter.toLowerCase()));
-
-  const uniqueSports = [...new Set(games.map(game => game.sport))];
 
   const formatOdds = (odds: number) => odds > 0 ? `+${odds}` : `${odds}`;
 
@@ -234,7 +229,7 @@ export const EnhancedCreateLegModal = ({
         <DialogHeader className="flex flex-row items-center justify-between">
           <DialogTitle className="flex items-center gap-2">
             <TrendingUp className="h-5 w-5" />
-            Place Your Bet - Live DraftKings Odds
+            NFL Betting - Live DraftKings Odds
           </DialogTitle>
           <Button
             variant="ghost"
@@ -255,29 +250,17 @@ export const EnhancedCreateLegModal = ({
           </div>
         ) : (
           <div className="space-y-6">
-            {/* Sport Filter */}
-            <div className="flex items-center gap-4">
-              <Label>Filter by Sport:</Label>
-              <Select value={sportFilter} onValueChange={setSportFilter}>
-                <SelectTrigger className="w-48">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Sports</SelectItem>
-                  {uniqueSports.map((sport) => (
-                    <SelectItem key={sport} value={sport}>
-                      {sport}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-
             {/* Game Selection */}
             <div className="space-y-4">
-              <h3 className="text-lg font-semibold">Select a Game</h3>
+              <h3 className="text-lg font-semibold">Select an NFL Game</h3>
               <div className="grid gap-3 max-h-60 overflow-y-auto">
-                {filteredGames.map((game) => (
+                {games.length === 0 ? (
+                  <div className="text-center py-8 text-muted-foreground">
+                    <p>No NFL games available at the moment.</p>
+                    <p className="text-sm mt-2">Try refreshing odds or check back later.</p>
+                  </div>
+                ) : (
+                  games.map((game) => (
                   <Card 
                     key={game.id}
                     className={`cursor-pointer transition-colors ${
@@ -287,23 +270,32 @@ export const EnhancedCreateLegModal = ({
                   >
                     <CardContent className="p-4">
                       <div className="flex items-center justify-between">
-                        <div>
-                          <div className="font-semibold">
+                        <div className="flex-1">
+                          <div className="font-semibold text-lg">
                             {game.team_a} vs {game.team_b}
                           </div>
                           <div className="text-sm text-muted-foreground">
-                            {game.league} • {new Date(game.game_date).toLocaleDateString()} at{' '}
+                            {new Date(game.game_date).toLocaleDateString('en-US', { 
+                              weekday: 'short', 
+                              month: 'short', 
+                              day: 'numeric' 
+                            })} at{' '}
                             {new Date(game.game_date).toLocaleTimeString([], { 
                               hour: '2-digit', 
                               minute: '2-digit' 
                             })}
                           </div>
                         </div>
-                        <Badge variant="secondary">{game.sport}</Badge>
+                        <div className="text-right">
+                          <Badge variant="outline" className="bg-gradient-to-r from-blue-600 to-red-600 text-white border-0">
+                            NFL
+                          </Badge>
+                        </div>
                       </div>
                     </CardContent>
-                  </Card>
-                ))}
+                    </Card>
+                  ))
+                )}
               </div>
             </div>
 
