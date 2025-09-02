@@ -97,13 +97,18 @@ export const EnhancedCreateLegModal = ({
       }
       
       // Then fetch NFL games from cache (including preseason)
+      // Only show games within the next 7 days to keep it relevant
+      const nextWeek = new Date();
+      nextWeek.setDate(nextWeek.getDate() + 7);
+      
       const { data, error } = await supabase
         .from('odds_cache')
         .select('*')
         .in('league', ['AMERICANFOOTBALL NFL', 'AMERICANFOOTBALL NFL PRESEASON'])
         .gte('game_date', new Date().toISOString())
+        .lte('game_date', nextWeek.toISOString())
         .order('game_date', { ascending: true })
-        .limit(30);
+        .limit(20);
 
       if (error) {
         console.error('Database error:', error);
@@ -206,6 +211,24 @@ export const EnhancedCreateLegModal = ({
     setLoading(true);
     
     try {
+      // Check if user already has a leg for this week
+      const { data: existingLeg, error: checkError } = await supabase
+        .from('legs')
+        .select('id')
+        .eq('user_id', user.id)
+        .eq('week_id', weekId)
+        .maybeSingle();
+
+      if (checkError) {
+        console.error('Error checking existing leg:', checkError);
+        throw new Error('Failed to verify submission eligibility');
+      }
+
+      if (existingLeg) {
+        toast.error('You have already submitted a leg for this week. Only one submission per week is allowed.');
+        return;
+      }
+
       const decimalOdds = americanToDecimal(selectedBet.odds);
 
       const { error } = await supabase
@@ -227,7 +250,13 @@ export const EnhancedCreateLegModal = ({
           status: 'PENDING'
         });
 
-      if (error) throw error;
+      if (error) {
+        if (error.code === '23505' && error.message?.includes('unique_user_week_leg')) {
+          toast.error('You have already submitted a leg for this week.');
+          return;
+        }
+        throw error;
+      }
 
       toast.success('Leg submitted successfully!');
       onLegCreated();

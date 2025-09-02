@@ -4,10 +4,11 @@ import { toast } from "@/hooks/use-toast";
 
 export const signUp = async (email: string, password: string, name: string) => {
   try {
-    const { data, error } = await supabase.auth.signUp({
+  const { data, error } = await supabase.auth.signUp({
       email,
       password,
       options: {
+        emailRedirectTo: `${window.location.origin}/`,
         data: {
           full_name: name,
         }
