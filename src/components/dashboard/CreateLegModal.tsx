@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
 import {
@@ -28,6 +28,7 @@ interface CreateLegModalProps {
 export const CreateLegModal = ({ open, onOpenChange, onLegCreated }: CreateLegModalProps) => {
   const { user } = useAuth();
   const [loading, setLoading] = useState(false);
+  const [currentWeek, setCurrentWeek] = useState<{id: string, week_number: number} | null>(null);
   const [formData, setFormData] = useState({
     sport: '',
     league: '',
@@ -54,6 +55,52 @@ export const CreateLegModal = ({ open, onOpenChange, onLegCreated }: CreateLegMo
     });
   };
 
+  // Fetch current open week
+  const fetchCurrentWeek = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('weeks')
+        .select('id, week_number')
+        .eq('status', 'OPEN')
+        .order('week_number', { ascending: false })
+        .limit(1)
+        .single();
+      
+      if (error) throw error;
+      setCurrentWeek(data);
+    } catch (error) {
+      console.error('Error fetching current week:', error);
+      toast({
+        title: "Error",
+        description: "No open week found for submissions",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const validateForm = () => {
+    if (!currentWeek) {
+      toast({
+        title: "Error",
+        description: "No open week available for submissions",
+        variant: "destructive",
+      });
+      return false;
+    }
+
+    const americanOdds = parseInt(formData.odds);
+    if (isNaN(americanOdds) || americanOdds < -10000 || americanOdds > 10000 || americanOdds === 0) {
+      toast({
+        title: "Invalid Odds",
+        description: "American odds must be a number between -10000 and +10000 (excluding 0)",
+        variant: "destructive",
+      });
+      return false;
+    }
+
+    return true;
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
@@ -65,6 +112,8 @@ export const CreateLegModal = ({ open, onOpenChange, onLegCreated }: CreateLegMo
       });
       return;
     }
+
+    if (!validateForm()) return;
 
     setLoading(true);
 
@@ -82,12 +131,12 @@ export const CreateLegModal = ({ open, onOpenChange, onLegCreated }: CreateLegMo
         .from('legs')
         .insert({
           user_id: user.id,
-          week_id: crypto.randomUUID(), // Generate a temporary week ID
+          week_id: currentWeek!.id, // Use actual week ID
           sport_key: formData.sport.toLowerCase(),
-          league: formData.league,
-          game_desc: `${formData.team_a} vs ${formData.team_b}`,
+          league: formData.league.trim(),
+          game_desc: `${formData.team_a.trim()} vs ${formData.team_b.trim()}`,
           market_key: formData.bet_type,
-          selection: formData.selection,
+          selection: formData.selection.trim(),
           american_odds: americanOdds,
           decimal_odds: decimalOdds,
           source: 'manual',
@@ -119,11 +168,20 @@ export const CreateLegModal = ({ open, onOpenChange, onLegCreated }: CreateLegMo
     }));
   };
 
+  // Load current week when modal opens
+  useEffect(() => {
+    if (open) {
+      fetchCurrentWeek();
+    }
+  }, [open]);
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-md">
         <DialogHeader>
-          <DialogTitle>Add New Leg</DialogTitle>
+          <DialogTitle>
+            Add New Leg {currentWeek && `(Week ${currentWeek.week_number})`}
+          </DialogTitle>
         </DialogHeader>
         
         <form onSubmit={handleSubmit} className="space-y-4">

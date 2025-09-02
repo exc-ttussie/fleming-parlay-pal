@@ -43,10 +43,20 @@ export const SubmitLegModal = ({ open, onClose, weekId, onSuccess }: SubmitLegMo
     }
 
     const odds = parseInt(americanOdds);
-    if (isNaN(odds)) {
+    if (isNaN(odds) || odds < -10000 || odds > 10000 || odds === 0) {
       toast({
         title: "Invalid Odds",
-        description: "American odds must be a valid number",
+        description: "American odds must be a number between -10000 and +10000 (excluding 0)",
+        variant: "destructive",
+      });
+      return false;
+    }
+
+    // Sanitize notes to prevent XSS
+    if (notes.length > 500) {
+      toast({
+        title: "Invalid Notes",
+        description: "Notes must be 500 characters or less",
         variant: "destructive",
       });
       return false;
@@ -78,7 +88,7 @@ export const SubmitLegModal = ({ open, onClose, weekId, onSuccess }: SubmitLegMo
           decimal_odds: decimal,
           source: source,
           bookmaker: 'draftkings',
-          notes: notes.trim() || null,
+          notes: notes.trim().replace(/<[^>]*>/g, '') || null, // Strip HTML tags for security
           status: 'PENDING'
         });
 
