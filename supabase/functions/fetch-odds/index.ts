@@ -34,155 +34,7 @@ interface OddsResponse {
   }>;
 }
 
-// Fallback games array
-const fallbackGames = [
-  {
-    external_game_id: 'test-game-1',
-    sport: 'American Football',
-    league: 'AMERICANFOOTBALL NFL PRESEASON',
-    game_date: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(), // Tomorrow
-    team_a: 'Kansas City Chiefs',
-    team_b: 'Buffalo Bills',
-    moneyline_home: -150,
-    moneyline_away: 130,
-    spread_home: -3.5,
-    spread_home_odds: -110,
-    spread_away: 3.5,
-    spread_away_odds: -110,
-    total_over: 42.5,
-    total_over_odds: -110,
-    total_under: 42.5,
-    total_under_odds: -110,
-    player_props: {
-      'Passing': {
-        'player_pass_yds': {
-          'Patrick Mahomes': { player_name: 'Patrick Mahomes', market_key: 'player_pass_yds', category: 'Passing', point: 275.5, price: -110, bookmaker: 'draftkings' },
-          'Josh Allen': { player_name: 'Josh Allen', market_key: 'player_pass_yds', category: 'Passing', point: 267.5, price: -115, bookmaker: 'draftkings' }
-        },
-        'player_pass_tds': {
-          'Patrick Mahomes': { player_name: 'Patrick Mahomes', market_key: 'player_pass_tds', category: 'Passing', point: 1.5, price: -125, bookmaker: 'draftkings' },
-          'Josh Allen': { player_name: 'Josh Allen', market_key: 'player_pass_tds', category: 'Passing', point: 1.5, price: -105, bookmaker: 'draftkings' }
-        }
-      },
-      'Rushing': {
-        'player_rush_yds': {
-          'Josh Allen': { player_name: 'Josh Allen', market_key: 'player_rush_yds', category: 'Rushing', point: 42.5, price: -110, bookmaker: 'draftkings' },
-          'Isiah Pacheco': { player_name: 'Isiah Pacheco', market_key: 'player_rush_yds', category: 'Rushing', point: 67.5, price: -115, bookmaker: 'draftkings' }
-        }
-      },
-      // Comprehensive player props
-      'Receiving': {
-        'player_reception_yds': {
-          'Travis Kelce': { player_name: 'Travis Kelce', market_key: 'player_reception_yds', category: 'Receiving', point: 67.5, price: -120, bookmaker: 'draftkings' },
-          'Stefon Diggs': { player_name: 'Stefon Diggs', market_key: 'player_reception_yds', category: 'Receiving', point: 74.5, price: -110, bookmaker: 'draftkings' }
-        }
-      },
-      'Touchdowns': {
-        'player_anytime_td': {
-          'Travis Kelce': { player_name: 'Travis Kelce', market_key: 'player_anytime_td', category: 'Touchdowns', point: null, price: 120, bookmaker: 'draftkings' },
-          'Stefon Diggs': { player_name: 'Stefon Diggs', market_key: 'player_anytime_td', category: 'Touchdowns', point: null, price: 135, bookmaker: 'draftkings' }
-        }
-      }
-    },
-    updated_at: new Date().toISOString(),
-  },
-  {
-    external_game_id: 'test-game-2',
-    sport: 'American Football',
-    league: 'AMERICANFOOTBALL NFL PRESEASON',
-    game_date: new Date(Date.now() + 2 * 24 * 60 * 60 * 1000).toISOString(),
-    team_a: 'Dallas Cowboys',
-    team_b: 'Philadelphia Eagles',
-    moneyline_home: 105,
-    moneyline_away: -125,
-    spread_home: 1.5,
-    spread_home_odds: -110,
-    spread_away: -1.5,
-    spread_away_odds: -110,
-    total_over: 38.5,
-    total_over_odds: -105,
-    total_under: 38.5,
-    total_under_odds: -115,
-    player_props: {
-      'Passing': {
-        'player_pass_yds': {
-          'Dak Prescott': { player_name: 'Dak Prescott', market_key: 'player_pass_yds', category: 'Passing', point: 245.5, price: -110, bookmaker: 'draftkings' },
-          'Jalen Hurts': { player_name: 'Jalen Hurts', market_key: 'player_pass_yds', category: 'Passing', point: 225.5, price: -115, bookmaker: 'draftkings' }
-        }
-      },
-      'Rushing': {
-        'player_rush_yds': {
-          'Jalen Hurts': { player_name: 'Jalen Hurts', market_key: 'player_rush_yds', category: 'Rushing', point: 47.5, price: -110, bookmaker: 'draftkings' },
-          'Ezekiel Elliott': { player_name: 'Ezekiel Elliott', market_key: 'player_rush_yds', category: 'Rushing', point: 52.5, price: -105, bookmaker: 'draftkings' }
-        }
-      }
-    },
-    updated_at: new Date().toISOString(),
-  },
-  {
-    external_game_id: 'test-dolphins-game',
-    sport: 'American Football',
-    league: 'AMERICANFOOTBALL NFL',
-    game_date: new Date(Date.now() + 36 * 60 * 60 * 1000).toISOString(),
-    team_a: 'Miami Dolphins',
-    team_b: 'New York Jets',
-    moneyline_home: -125,
-    moneyline_away: 105,
-    spread_home: -2.5,
-    spread_home_odds: -110,
-    spread_away: 2.5,
-    spread_away_odds: -110,
-    total_over: 44.5,
-    total_over_odds: -110,
-    total_under: 44.5,
-    total_under_odds: -110,
-    player_props: {
-      'Passing': {
-        'player_pass_yds': {
-          'Tua Tagovailoa': { player_name: 'Tua Tagovailoa', market_key: 'player_pass_yds', category: 'Passing', point: 247.5, price: -115, bookmaker: 'draftkings' },
-          'Aaron Rodgers': { player_name: 'Aaron Rodgers', market_key: 'player_pass_yds', category: 'Passing', point: 265.5, price: -110, bookmaker: 'draftkings' }
-        },
-        'player_pass_tds': {
-          'Tua Tagovailoa': { player_name: 'Tua Tagovailoa', market_key: 'player_pass_tds', category: 'Passing', point: 1.5, price: -120, bookmaker: 'draftkings' },
-          'Aaron Rodgers': { player_name: 'Aaron Rodgers', market_key: 'player_pass_tds', category: 'Passing', point: 1.5, price: -105, bookmaker: 'draftkings' }
-        },
-        'player_pass_completions': {
-          'Tua Tagovailoa': { player_name: 'Tua Tagovailoa', market_key: 'player_pass_completions', category: 'Passing', point: 22.5, price: -110, bookmaker: 'draftkings' },
-          'Aaron Rodgers': { player_name: 'Aaron Rodgers', market_key: 'player_pass_completions', category: 'Passing', point: 20.5, price: -115, bookmaker: 'draftkings' }
-        }
-      },
-      'Rushing': {
-        'player_rush_yds': {
-          'De\'Von Achane': { player_name: 'De\'Von Achane', market_key: 'player_rush_yds', category: 'Rushing', point: 78.5, price: -110, bookmaker: 'draftkings' },
-          'Breece Hall': { player_name: 'Breece Hall', market_key: 'player_rush_yds', category: 'Rushing', point: 65.5, price: -115, bookmaker: 'draftkings' }
-        },
-        'player_rush_tds': {
-          'De\'Von Achane': { player_name: 'De\'Von Achane', market_key: 'player_rush_tds', category: 'Rushing', point: 0.5, price: 115, bookmaker: 'draftkings' },
-          'Breece Hall': { player_name: 'Breece Hall', market_key: 'player_rush_tds', category: 'Rushing', point: 0.5, price: 105, bookmaker: 'draftkings' }
-        }
-      },
-      'Receiving': {
-        'player_reception_yds': {
-          'Tyreek Hill': { player_name: 'Tyreek Hill', market_key: 'player_reception_yds', category: 'Receiving', point: 85.5, price: -115, bookmaker: 'draftkings' },
-          'Jaylen Waddle': { player_name: 'Jaylen Waddle', market_key: 'player_reception_yds', category: 'Receiving', point: 62.5, price: -110, bookmaker: 'draftkings' },
-          'Garrett Wilson': { player_name: 'Garrett Wilson', market_key: 'player_reception_yds', category: 'Receiving', point: 68.5, price: -105, bookmaker: 'draftkings' }
-        },
-        'player_receptions': {
-          'Tyreek Hill': { player_name: 'Tyreek Hill', market_key: 'player_receptions', category: 'Receiving', point: 6.5, price: -120, bookmaker: 'draftkings' },
-          'Jaylen Waddle': { player_name: 'Jaylen Waddle', market_key: 'player_receptions', category: 'Receiving', point: 5.5, price: -110, bookmaker: 'draftkings' }
-        }
-      },
-      'Touchdowns': {
-        'player_anytime_td': {
-          'Tyreek Hill': { player_name: 'Tyreek Hill', market_key: 'player_anytime_td', category: 'Touchdowns', point: null, price: 140, bookmaker: 'draftkings' },
-          'De\'Von Achane': { player_name: 'De\'Von Achane', market_key: 'player_anytime_td', category: 'Touchdowns', point: null, price: 130, bookmaker: 'draftkings' },
-          'Garrett Wilson': { player_name: 'Garrett Wilson', market_key: 'player_anytime_td', category: 'Touchdowns', point: null, price: 155, bookmaker: 'draftkings' }
-        }
-      }
-    },
-    updated_at: new Date().toISOString(),
-  }
-];
+// No fallback data - only live API data
 
 const handler = async (req: Request): Promise<Response> => {
   // Handle CORS preflight requests
@@ -233,22 +85,11 @@ const handler = async (req: Request): Promise<Response> => {
       console.log(`Fetching games from ${commenceTimeFrom} to ${commenceTimeTo}...`);
       
       const basicMarkets = 'h2h,spreads,totals';
-      const playerPropMarkets = [
-        'player_pass_yds', 'player_pass_tds', 'player_pass_completions', 'player_pass_attempts',
-        'player_pass_interceptions', 'player_rush_yds', 'player_rush_tds', 'player_rush_attempts',
-        'player_receptions', 'player_reception_yds', 'player_reception_tds', 'player_anytime_td',
-        'player_1st_td', 'player_sacks', 'player_tackles_assists', 'player_field_goals',
-        'player_kicking_points', 'player_pass_rush_reception_yds', 'player_rush_reception_yds'
-      ].join(',');
       
-      // Fetch all data concurrently for current NFL season only
-      const [nflResponse, nflPlayerPropsResponse] = await Promise.all([
-        // Regular season/playoff games (next 14 days)
-        fetch(`https://api.the-odds-api.com/v4/sports/americanfootball_nfl/odds/?apiKey=${oddsApiKey}&regions=us&markets=${basicMarkets}&oddsFormat=american&bookmakers=draftkings,fanduel,betmgm,caesars&commenceTimeFrom=${commenceTimeFrom}&commenceTimeTo=${commenceTimeTo}`),
-        
-        // NFL player props (bulk fetch - huge performance gain)
-        fetch(`https://api.the-odds-api.com/v4/sports/americanfootball_nfl/odds/?apiKey=${oddsApiKey}&regions=us&markets=${playerPropMarkets}&oddsFormat=american&bookmakers=draftkings,fanduel,betmgm,caesars,betonlineag&commenceTimeFrom=${commenceTimeFrom}&commenceTimeTo=${commenceTimeTo}`)
-      ]);
+      // Fetch basic game data only - no player props for now due to API market changes
+      const nflResponse = await fetch(
+        `https://api.the-odds-api.com/v4/sports/americanfootball_nfl/odds/?apiKey=${oddsApiKey}&regions=us&markets=${basicMarkets}&oddsFormat=american&bookmakers=draftkings,fanduel,betmgm,caesars&commenceTimeFrom=${commenceTimeFrom}&commenceTimeTo=${commenceTimeTo}`
+      );
 
       // Extract rate limit info from response
       const remainingRequests = nflResponse.headers.get('x-requests-remaining');
@@ -339,70 +180,13 @@ const handler = async (req: Request): Promise<Response> => {
         );
       }
 
-      const [nflGames, nflPlayerProps] = await Promise.all([
-        nflResponse.json(),
-        nflPlayerPropsResponse.ok ? nflPlayerPropsResponse.json() : []
-      ]);
+      const nflGames = await nflResponse.json();
 
       console.log(`Fetched ${nflGames.length} NFL games in next 14 days`);
-      console.log(`Fetched player props for ${nflPlayerProps.length} games`);
       
-      // Enhanced debugging for player props API response
-      if (nflPlayerPropsResponse.ok) {
-        console.log('Player props API call successful');
-        console.log('Player props response status:', nflPlayerPropsResponse.status);
-        console.log('Player props data length:', nflPlayerProps.length);
-        
-        if (nflPlayerProps.length === 0) {
-          console.log('⚠️ WARNING: Player props API returned empty array');
-          console.log('This likely means:');
-          console.log('1. Player props not yet available for games (released 24-48h before)');
-          console.log('2. API endpoint structure changed');
-          console.log('3. No games have player prop markets available');
-          console.log('📋 Will use fallback data with comprehensive player props');
-        } else {
-          console.log('✅ Player props data available, analyzing...');
-          nflPlayerProps.forEach((game: any, idx: number) => {
-            console.log(`Game ${idx + 1}: ${game.home_team} vs ${game.away_team}`);
-            console.log(`- Bookmakers: ${game.bookmakers?.length || 0}`);
-            game.bookmakers?.forEach((bookmaker: any) => {
-              console.log(`  - ${bookmaker.title}: ${bookmaker.markets?.length || 0} markets`);
-            });
-          });
-        }
-      } else {
-        console.error('Player props API failed:', nflPlayerPropsResponse.status);
-        const errorText = await nflPlayerPropsResponse.text();
-        console.error('Player props API error details:', errorText);
-      }
-      
-      // Process games and merge with player props data
+      // Process games - basic odds only for now
       const processedGames = nflGames.map((game: any) => {
         const bestOdds = extractBestOdds(game);
-        
-        // Find matching player props for this game
-        const matchingPlayerProps = nflPlayerProps.find((propGame: any) => 
-          propGame.id === game.id || 
-          (propGame.home_team === game.home_team && propGame.away_team === game.away_team)
-        );
-        
-        let playerProps = {};
-        if (matchingPlayerProps) {
-          console.log(`✅ Found player props for ${game.home_team} vs ${game.away_team}`);
-          playerProps = extractPlayerProps(matchingPlayerProps);
-          
-          // Debug extracted props
-          const propCategories = Object.keys(playerProps).length;
-          console.log(`  - Extracted ${propCategories} prop categories`);
-          if (propCategories > 0) {
-            Object.keys(playerProps).forEach(category => {
-              const markets = Object.keys(playerProps[category] || {}).length;
-              console.log(`    - ${category}: ${markets} markets`);
-            });
-          }
-        } else {
-          console.log(`❌ No player props found for ${game.home_team} vs ${game.away_team}`);
-        }
         
         return {
           external_game_id: game.id,
@@ -412,169 +196,26 @@ const handler = async (req: Request): Promise<Response> => {
           team_a: game.home_team,
           team_b: game.away_team,
           ...bestOdds,
-          player_props: playerProps,
+          player_props: {}, // Empty for now - no player props available
           updated_at: new Date().toISOString(),
         };
       });
       
       allGames = processedGames;
       
-      // Check if we have meaningful player props data
-      const gamesWithProps = allGames.filter(game => 
-        game.player_props && Object.keys(game.player_props).length > 0
-      ).length;
-      
       console.log(`\n📊 PROCESSED GAMES SUMMARY:`);
       console.log(`Total games processed: ${allGames.length}`);
-      console.log(`Games with player props: ${gamesWithProps}`);
-      console.log(`Games without props: ${allGames.length - gamesWithProps}`);
+      console.log(`Live data only - no fallback data used`);
       
-      // If no games have props, or very few, use fallback data
-      if (gamesWithProps === 0 || allGames.length === 0) {
-        console.log('\n🔄 TRIGGERING FALLBACK: Insufficient player props from API');
-        console.log('Using comprehensive fallback data with rich player props...');
-        apiSuccess = false; // This will trigger fallback insertion below
-        
-        // Clear existing cache and insert fallback data
-        try {
-          const { error: clearAllError } = await supabase
-            .from('odds_cache')
-            .delete()
-            .gt('updated_at', '1900-01-01T00:00:00Z');
-          
-          if (clearAllError) {
-            console.error('Error clearing odds cache for fallback:', clearAllError);
-          } else {
-            console.log('Cleared existing odds cache for fallback insertion');
-          }
-
-          // Insert fallback games with comprehensive props
-          const { error: insertError } = await supabase
-            .from('odds_cache')
-            .insert(fallbackGames);
-          
-          if (insertError) {
-            console.error('Error inserting fallback games:', insertError);
-            throw new Error('Failed to insert fallback data');
-          }
-          
-          console.log(`✅ Successfully inserted ${fallbackGames.length} fallback games with comprehensive player props`);
-          
-          return new Response(
-            JSON.stringify({
-              success: true,
-              message: `API returned insufficient player props - using ${fallbackGames.length} test games with comprehensive player props including Tua Tagovailoa`,
-              games_processed: fallbackGames.length,
-              api_rate_limit: apiRateLimit,
-              api_success: false,
-              fallback_used: true
-            }),
-            {
-              status: 200,
-              headers: { 'Content-Type': 'application/json', ...corsHeaders },
-            }
-          );
-        } catch (fallbackError) {
-          console.error('Error in fallback insertion:', fallbackError);
-          throw fallbackError;
-        }
-      } else {
-        console.log('\n✅ Sufficient player props found from API');
-        apiSuccess = true;
-        
-        // Clear stale odds cache (older than 2 hours)
-        try {
-          const twoHoursAgo = new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString();
-          const { error: clearStaleError } = await supabase
-            .from('odds_cache')
-            .delete()
-            .lt('updated_at', twoHoursAgo);
-            
-          if (clearStaleError) {
-            console.error('Error clearing stale odds:', clearStaleError);
-          } else {
-            console.log('Cleared stale odds (older than 2 hours)');
-          }
-        } catch (clearError) {
-          console.error('Error in stale odds cleanup:', clearError);
-        }
-        
-        // Clear existing cache and insert fresh data
-        const { error: clearAllError } = await supabase
-          .from('odds_cache')
-          .delete()
-          .gt('updated_at', '1900-01-01T00:00:00Z'); // More robust than neq with uuid
-        
-        if (clearAllError) {
-          console.error('Error clearing odds cache:', clearAllError);
-        } else {
-          console.log('Cleared existing odds cache');
-        }
-
-        // Insert fresh games
-        if (allGames.length > 0) {
-          const { error: insertError } = await supabase
-            .from('odds_cache')
-            .insert(allGames);
-
-          if (insertError) {
-            console.error('Error inserting games:', insertError);
-            throw new Error('Failed to update odds cache');
-          }
-        }
-
-        console.log(`Successfully processed ${allGames.length} games`);
-        console.log(`Rate limit info: ${apiRateLimit.requests_remaining || 'N/A'} remaining, ${apiRateLimit.requests_used || 'N/A'} used`);
-        
-        const result = {
-          success: allGames.length > 0,
-          message: allGames.length > 0 ? `Successfully fetched and cached ${allGames.length} games with odds` : 'No current games found',
-          games_processed: allGames.length,
-          api_rate_limit: apiRateLimit,
-          api_success: apiSuccess
-        };
-        
-        return new Response(JSON.stringify(result), {
-          status: 200,
-          headers: { 'Content-Type': 'application/json', ...corsHeaders },
-        });
-      }
-      
-    } catch (apiError: any) {
-      console.error('API Error:', apiError);
-      
-      // Enhanced fallback with test data - clean up old logic
-      console.log('Falling back to comprehensive test data with player props...');
-      
-      // Clear any existing data
-      try {
-        const { error: clearAllError } = await supabase
-          .from('odds_cache')
-          .delete()
-          .gt('updated_at', '1900-01-01T00:00:00Z');
-        
-        if (clearAllError) {
-          console.error('Error clearing odds cache for fallback:', clearAllError);
-        } else {
-          console.log('Cleared existing odds cache for fallback insertion');
-        }
-      } catch (clearError) {
-        console.error('Error clearing cache:', clearError);
-      }
-      
-      // Insert fallback games with comprehensive props
-      const { error: insertError } = await supabase
-        .from('odds_cache')
-        .insert(fallbackGames);
-      
-      if (insertError) {
-        console.error('Error inserting fallback games:', insertError);
+      // Return error if no live games are available
+      if (allGames.length === 0) {
         return new Response(
           JSON.stringify({ 
             success: false, 
-            error: 'Database Error',
-            message: 'Failed to insert fallback data',
+            error: 'No Live Data Available', 
+            message: 'No NFL games found in the next 14 days. Live data only - no fallback data used.',
             games_processed: 0,
+            api_rate_limit: apiRateLimit,
             api_success: false
           }),
           {
@@ -584,16 +225,72 @@ const handler = async (req: Request): Promise<Response> => {
         );
       }
       
-      console.log(`Successfully inserted ${fallbackGames.length} fallback games with comprehensive player props`);
+      // Clear stale odds cache (older than 2 hours)
+      try {
+        const twoHoursAgo = new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString();
+        const { error: clearStaleError } = await supabase
+          .from('odds_cache')
+          .delete()
+          .lt('updated_at', twoHoursAgo);
+          
+        if (clearStaleError) {
+          console.error('Error clearing stale odds:', clearStaleError);
+        } else {
+          console.log('Cleared stale odds (older than 2 hours)');
+        }
+      } catch (clearError) {
+        console.error('Error in stale odds cleanup:', clearError);
+      }
       
+      // Clear existing cache and insert fresh data
+      const { error: clearAllError } = await supabase
+        .from('odds_cache')
+        .delete()
+        .gt('updated_at', '1900-01-01T00:00:00Z');
+      
+      if (clearAllError) {
+        console.error('Error clearing odds cache:', clearAllError);
+      } else {
+        console.log('Cleared existing odds cache');
+      }
+
+      // Insert fresh games
+      const { error: insertError } = await supabase
+        .from('odds_cache')
+        .insert(allGames);
+
+      if (insertError) {
+        console.error('Error inserting games:', insertError);
+        throw new Error('Failed to update odds cache');
+      }
+
+      console.log(`Successfully processed ${allGames.length} games`);
+      console.log(`Rate limit info: ${apiRateLimit.requests_remaining || 'N/A'} remaining, ${apiRateLimit.requests_used || 'N/A'} used`);
+      
+      return new Response(JSON.stringify({
+        success: true,
+        message: `Successfully fetched and cached ${allGames.length} live NFL games (basic odds only)`,
+        games_processed: allGames.length,
+        api_rate_limit: apiRateLimit,
+        api_success: true,
+        player_props_available: false
+      }), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json', ...corsHeaders },
+      });
+      
+    } catch (apiError: any) {
+      console.error('API Error:', apiError);
+      
+      // No fallback - live data only
       return new Response(
-        JSON.stringify({
-          success: true,
-          message: `API unavailable - using ${fallbackGames.length} test games with comprehensive player props including Tua Tagovailoa`,
-          games_processed: fallbackGames.length,
+        JSON.stringify({ 
+          success: false, 
+          error: 'API Service Unavailable', 
+          message: 'Live NFL data is currently unavailable. No fallback data used - accuracy over availability.',
+          games_processed: 0,
           api_rate_limit: { requests_remaining: null, requests_used: null },
-          api_success: false,
-          fallback_used: true
+          api_success: false
         }),
         {
           status: 200,
