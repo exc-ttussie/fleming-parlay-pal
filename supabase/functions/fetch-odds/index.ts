@@ -256,23 +256,76 @@ const handler = async (req: Request): Promise<Response> => {
 
       // Check responses with detailed error handling
       if (!nflResponse.ok) {
-        const errorText = await nflResponse.text();
-        console.error(`NFL API Error ${nflResponse.status}:`, errorText);
+        let errorText = '';
+        let errorObj: any = {};
         
-        // Enhanced error messages for common issues
-        if (nflResponse.status === 401) {
-          const errorObj = JSON.parse(errorText || '{}');
-          if (errorObj?.error_code === 'MISSING_KEY') {
-            throw new Error(`API Authentication Failed (401): Invalid or missing ODDS_API_KEY. Please check your API key configuration.`);
-          } else if (errorObj?.error_code === 'QUOTA_EXCEEDED') {
-            throw new Error(`API Quota Exceeded (401): You have reached your API request limit. Please upgrade your plan or wait for quota reset.`);
-          } else {
-            throw new Error(`API Authentication Failed (401): ${errorText}`);
-          }
+        try {
+          errorText = await nflResponse.text();
+          errorObj = JSON.parse(errorText || '{}');
+        } catch (parseError) {
+          console.error('Could not parse API error response:', parseError);
         }
         
-        throw new Error(`NFL API request failed: ${nflResponse.status} - ${errorText}`);
+        console.error(`NFL API Error ${nflResponse.status}:`, errorText);
+        
+        // Enhanced error messages for common issues with consistent JSON responses
+        if (nflResponse.status === 401) {
+          if (errorObj?.error_code === 'MISSING_KEY') {
+            return new Response(
+              JSON.stringify({ 
+                success: false, 
+                error: 'API Authentication Failed',
+                message: 'Invalid or missing ODDS_API_KEY. Please check your API key configuration.',
+                games_processed: 0 
+              }),
+              { status: 200, headers: { 'Content-Type': 'application/json', ...corsHeaders } }
+            );
+          } else if (errorObj?.error_code === 'QUOTA_EXCEEDED') {
+            return new Response(
+              JSON.stringify({ 
+                success: false, 
+                error: 'API Quota Exceeded',
+                message: 'You have reached your API request limit. Please upgrade your plan or wait for quota reset.',
+                games_processed: 0 
+              }),
+              { status: 200, headers: { 'Content-Type': 'application/json', ...corsHeaders } }
+            );
+          } else {
+            return new Response(
+              JSON.stringify({ 
+                success: false, 
+                error: 'API Authentication Failed',
+                message: `API key authentication failed: ${errorText}`,
+                games_processed: 0 
+              }),
+              { status: 200, headers: { 'Content-Type': 'application/json', ...corsHeaders } }
+            );
+          }
+        } else if (nflResponse.status === 404) {
+          return new Response(
+            JSON.stringify({ 
+              success: false, 
+              error: 'No Upcoming Games',
+              message: 'No NFL games found in the next 14 days.',
+              games_processed: 0 
+            }),
+            { status: 200, headers: { 'Content-Type': 'application/json', ...corsHeaders } }
+          );
+        } else {
+          return new Response(
+            JSON.stringify({ 
+              success: false, 
+              error: 'API Service Error',
+              message: `NFL API service error (${nflResponse.status}): ${errorText}`,
+              games_processed: 0 
+            }),
+            { status: 200, headers: { 'Content-Type': 'application/json', ...corsHeaders } }
+          );
+        }
       }
+
+      // Set API success flag here after successful response
+      apiSuccess = true;
 
       const [nflGames, nflPlayerProps] = await Promise.all([
         nflResponse.json(),

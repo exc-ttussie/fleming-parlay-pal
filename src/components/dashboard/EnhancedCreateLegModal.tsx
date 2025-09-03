@@ -4,6 +4,7 @@ import { supabase } from '@/integrations/supabase/client';
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
@@ -115,8 +116,17 @@ export const EnhancedCreateLegModal = ({
       } else {
         console.log('Odds refresh result:', data);
         
-        if (data?.api_success === false) {
-          toast.info(data?.message || 'Using test data with sample player props including Tua Tagovailoa');
+        if (data?.success === false) {
+          // Handle different error types with clear user messages
+          if (data?.error === 'API Authentication Failed') {
+            toast.error('Live odds unavailable: API key invalid or not configured');
+          } else if (data?.error === 'API Quota Exceeded') {
+            toast.error('Live odds unavailable: API quota exceeded');
+          } else if (data?.error === 'No Upcoming Games') {
+            toast.info('No upcoming NFL games found in the next 14 days');
+          } else {
+            toast.error(`Live odds unavailable: ${data?.message || 'Unknown error'}`);
+          }
         } else if (data?.success) {
           toast.success(data?.message || 'Odds refreshed successfully');
         }
@@ -128,7 +138,7 @@ export const EnhancedCreateLegModal = ({
         .select('*')
         .eq('sport', 'American Football')
         .gt('game_date', new Date().toISOString())
-        .lt('game_date', new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString())
+        .lt('game_date', new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString())
         .order('game_date', { ascending: true });
       
       if (gamesError) {
@@ -443,6 +453,9 @@ export const EnhancedCreateLegModal = ({
             <TrendingUp className="h-5 w-5 text-primary" />
             <span className="text-primary font-bold">LET THE DEED SHAW</span> - NFL Betting
           </DialogTitle>
+          <DialogDescription className="sr-only">
+            Select an NFL game and bet type to submit your leg for this week's parlay
+          </DialogDescription>
           <Button
             variant="ghost"
             size="sm"
