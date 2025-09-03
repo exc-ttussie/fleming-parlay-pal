@@ -226,8 +226,9 @@ const handler = async (req: Request): Promise<Response> => {
       // Calculate date range for current/upcoming games (14 days)
       const today = new Date();
       const twoWeeksFromNow = new Date(today.getTime() + (14 * 24 * 60 * 60 * 1000));
-      const commenceTimeFrom = today.toISOString();
-      const commenceTimeTo = twoWeeksFromNow.toISOString();
+      // Remove milliseconds from ISO string to match API format requirement
+      const commenceTimeFrom = today.toISOString().split('.')[0] + 'Z';
+      const commenceTimeTo = twoWeeksFromNow.toISOString().split('.')[0] + 'Z';
       
       console.log(`Fetching games from ${commenceTimeFrom} to ${commenceTimeTo}...`);
       

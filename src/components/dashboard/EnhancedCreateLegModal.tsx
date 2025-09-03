@@ -171,7 +171,7 @@ export const EnhancedCreateLegModal = ({
             return;
           }
           
-          toast.success(`Fetched ${functionData?.gamesProcessed || 0} games successfully`);
+          toast.success(`Fetched ${functionData?.games_processed || 0} games successfully`);
           
           // Retry the query after fetching fresh data
           const { data: retryData, error: retryError } = await supabase
