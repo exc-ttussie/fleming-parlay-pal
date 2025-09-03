@@ -53,11 +53,11 @@ export const AdminDashboard = () => {
   return (
     <Routes>
       <Route path="/" element={<AdminHome />} />
-      <Route path="/weeks" element={<WeekManagement />} />
-      <Route path="/legs" element={<LegApproval />} />
-      <Route path="/users" element={<GroupCoordination />} />
-      <Route path="/analytics" element={<div className="p-6">Analytics coming soon...</div>} />
-      <Route path="/settings" element={<div className="p-6">Settings coming soon...</div>} />
+      <Route path="weeks" element={<WeekManagement />} />
+      <Route path="legs" element={<LegApproval />} />
+      <Route path="users" element={<GroupCoordination />} />
+      <Route path="analytics" element={<div className="p-6">Analytics coming soon...</div>} />
+      <Route path="settings" element={<div className="p-6">Settings coming soon...</div>} />
     </Routes>
   );
 };
