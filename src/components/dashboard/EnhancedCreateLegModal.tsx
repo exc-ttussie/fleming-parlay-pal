@@ -25,6 +25,7 @@ import { Input } from '@/components/ui/input';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Search, User, BarChart3, Loader2, RefreshCw, TrendingUp } from 'lucide-react';
 import { americanToDecimal } from '@/lib/parlay';
+import { isValidOdds, isValidLine, isValidPlayerPropPrice, formatOdds } from '@/lib/oddsValidation';
 
 interface Game {
   id: string;
@@ -296,7 +297,7 @@ export const EnhancedCreateLegModal = ({
     const options: BetOption[] = [];
 
     // Moneyline options
-    if (game.moneyline_home) {
+    if (isValidOdds(game.moneyline_home)) {
       options.push({
         type: 'moneyline',
         selection: `${game.team_a} ML`,
@@ -304,7 +305,7 @@ export const EnhancedCreateLegModal = ({
         description: `${game.team_a} to win`
       });
     }
-    if (game.moneyline_away) {
+    if (isValidOdds(game.moneyline_away)) {
       options.push({
         type: 'moneyline',
         selection: `${game.team_b} ML`,
@@ -314,7 +315,7 @@ export const EnhancedCreateLegModal = ({
     }
 
     // Spread options
-    if (game.spread_home && game.spread_home_odds) {
+    if (isValidLine(game.spread_home) && isValidOdds(game.spread_home_odds)) {
       const spread = game.spread_home > 0 ? `+${game.spread_home}` : game.spread_home;
       options.push({
         type: 'spread',
@@ -324,7 +325,7 @@ export const EnhancedCreateLegModal = ({
         description: `${game.team_a} ${spread}`
       });
     }
-    if (game.spread_away && game.spread_away_odds) {
+    if (isValidLine(game.spread_away) && isValidOdds(game.spread_away_odds)) {
       const spread = game.spread_away > 0 ? `+${game.spread_away}` : game.spread_away;
       options.push({
         type: 'spread',
@@ -336,7 +337,7 @@ export const EnhancedCreateLegModal = ({
     }
 
     // Total options
-    if (game.total_over && game.total_over_odds) {
+    if (isValidLine(game.total_over) && isValidOdds(game.total_over_odds)) {
       options.push({
         type: 'total',
         selection: `Over ${game.total_over}`,
@@ -345,7 +346,7 @@ export const EnhancedCreateLegModal = ({
         description: `Over ${game.total_over} total points`
       });
     }
-    if (game.total_under && game.total_under_odds) {
+    if (isValidLine(game.total_under) && isValidOdds(game.total_under_odds)) {
       options.push({
         type: 'total',
         selection: `Under ${game.total_under}`,
@@ -374,9 +375,9 @@ export const EnhancedCreateLegModal = ({
           if (playerSearch && !playerName.toLowerCase().includes(playerSearch.toLowerCase())) return;
 
           // Handle Over/Under props with both prices
-          if (prop.point !== null && prop.point !== undefined) {
+          if (isValidLine(prop.point)) {
             // Create both Over and Under options if available
-            if (prop.over_price) {
+            if (isValidPlayerPropPrice(prop.over_price)) {
               options.push({
                 type: 'player_prop',
                 selection: `${playerName} ${formatPropName(marketKey)} Over ${prop.point}`,
@@ -389,7 +390,7 @@ export const EnhancedCreateLegModal = ({
               });
             }
             
-            if (prop.under_price) {
+            if (isValidPlayerPropPrice(prop.under_price)) {
               options.push({
                 type: 'player_prop',
                 selection: `${playerName} ${formatPropName(marketKey)} Under ${prop.point}`,
@@ -403,7 +404,7 @@ export const EnhancedCreateLegModal = ({
             }
             
             // Fallback: if no specific over/under prices, use the main price as Over
-            if (!prop.over_price && !prop.under_price) {
+            if (!isValidPlayerPropPrice(prop.over_price) && !isValidPlayerPropPrice(prop.under_price) && isValidPlayerPropPrice(prop.price)) {
               const description = `${playerName} ${formatPropName(marketKey)} Over ${prop.point}`;
               options.push({
                 type: 'player_prop',
@@ -416,7 +417,7 @@ export const EnhancedCreateLegModal = ({
                 prop_category: category
               });
             }
-          } else {
+          } else if (isValidPlayerPropPrice(prop.price)) {
             // For props without points (like anytime TD)
             const description = `${playerName} ${formatPropName(marketKey)}`;
             options.push({
