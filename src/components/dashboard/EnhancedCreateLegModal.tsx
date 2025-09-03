@@ -56,6 +56,8 @@ interface PlayerProp {
   price: number;
   bookmaker: string;
   description?: string;
+  over_price?: number;
+  under_price?: number;
 }
 
 interface PlayerPropsData {
@@ -371,20 +373,64 @@ export const EnhancedCreateLegModal = ({
           // Filter by player search if search term exists
           if (playerSearch && !playerName.toLowerCase().includes(playerSearch.toLowerCase())) return;
 
-          const description = prop.point 
-            ? `${playerName} ${formatPropName(marketKey)} ${prop.point > 0 ? 'Over' : 'Under'} ${Math.abs(prop.point)}`
-            : `${playerName} ${formatPropName(marketKey)}`;
+          // Handle Over/Under props with both prices
+          if (prop.point !== null && prop.point !== undefined) {
+            // Create both Over and Under options if available
+            if (prop.over_price) {
+              options.push({
+                type: 'player_prop',
+                selection: `${playerName} ${formatPropName(marketKey)} Over ${prop.point}`,
+                odds: prop.over_price,
+                line: prop.point,
+                description: `${playerName} ${formatPropName(marketKey)} Over ${prop.point}`,
+                player_name: playerName,
+                prop_type: marketKey,
+                prop_category: category
+              });
+            }
+            
+            if (prop.under_price) {
+              options.push({
+                type: 'player_prop',
+                selection: `${playerName} ${formatPropName(marketKey)} Under ${prop.point}`,
+                odds: prop.under_price,
+                line: -prop.point, // Negative to indicate Under
+                description: `${playerName} ${formatPropName(marketKey)} Under ${prop.point}`,
+                player_name: playerName,
+                prop_type: marketKey,
+                prop_category: category
+              });
+            }
+            
+            // Fallback: if no specific over/under prices, use the main price as Over
+            if (!prop.over_price && !prop.under_price) {
+              const description = `${playerName} ${formatPropName(marketKey)} Over ${prop.point}`;
+              options.push({
+                type: 'player_prop',
+                selection: description,
+                odds: prop.price,
+                line: prop.point,
+                description,
+                player_name: playerName,
+                prop_type: marketKey,
+                prop_category: category
+              });
+            }
+          } else {
+            // For props without points (like anytime TD)
+            const description = `${playerName} ${formatPropName(marketKey)}`;
+            options.push({
+              type: 'player_prop',
+              selection: description,
+              odds: prop.price,
+              line: prop.point,
+              description,
+              player_name: playerName,
+              prop_type: marketKey,
+              prop_category: category
+            });
+          }
 
-          options.push({
-            type: 'player_prop',
-            selection: description,
-            odds: prop.price,
-            line: prop.point,
-            description,
-            player_name: playerName,
-            prop_type: marketKey,
-            prop_category: category
-          });
         });
       });
     });

@@ -347,152 +347,220 @@ const handler = async (req: Request): Promise<Response> => {
       console.log(`Fetched ${nflGames.length} NFL games in next 14 days`);
       console.log(`Fetched player props for ${nflPlayerProps.length} games`);
       
-      // Process games and extract best odds
-      // const allGames = nflGames.map(game => {
-      //   const bestOdds = extractBestOdds(game);
-      //   return {
-      //     external_game_id: game.id,
-      //     sport: 'American Football',
-      //     league: 'AMERICANFOOTBALL NFL',
-      //     game_date: game.commence_time,
-      //     team_a: game.home_team,
-      //     team_b: game.away_team,
-      //     ...bestOdds,
-      //     updated_at: new Date().toISOString(),
-      //   };
-      // });
-      
-      // Function to process each game and extract player props
-      // const processGame = async (game: any) => {
-      //   const bestOdds = extractBestOdds(game);
-      //   let playerProps = {};
+      // Enhanced debugging for player props API response
+      if (nflPlayerPropsResponse.ok) {
+        console.log('Player props API call successful');
+        console.log('Player props response status:', nflPlayerPropsResponse.status);
+        console.log('Player props data length:', nflPlayerProps.length);
         
-      //   // Fetch player props only if the game has bookmakers
-      //   if (game.bookmakers && game.bookmakers.length > 0) {
-      //     try {
-      //       // Fetch player props for the specific game
-      //       const playerPropsResponse = await fetch(
-      //         `https://api.the-odds-api.com/v4/sports/${game.sport_key}/odds/?apiKey=${oddsApiKey}&regions=us&markets=player_pass_yds,player_pass_tds,player_rush_yds,player_rush_tds,player_reception_yds,player_receptions,player_anytime_td&oddsFormat=american&bookmakers=draftkings,fanduel,betmgm,caesars`,
-      //         {
-      //           headers: {
-      //             'Content-Type': 'application/json',
-      //           },
-      //         }
-      //       );
-            
-      //       if (!playerPropsResponse.ok) {
-      //         console.error(`Player Props API Error ${playerPropsResponse.status}:`, await playerPropsResponse.text());
-      //       } else {
-      //         const playerPropsData = await playerPropsResponse.json();
-      //         playerProps = extractPlayerProps(playerPropsData[0]); // Assuming only one game is returned
-      //       }
-      //     } catch (playerPropsError) {
-      //       console.error('Error fetching player props:', playerPropsError);
-      //     }
-      //   } else {
-      //     console.log(`No bookmakers available for game ${game.id}, skipping player props`);
-      //   }
-        
-      //   // Create proper league name format
-      //   let leagueName = 'AMERICANFOOTBALL NFL';
-        
-      //   return {
-      //     external_game_id: game.id,
-      //     sport: 'American Football',
-      //     league: leagueName,
-      //     game_date: game.commence_time,
-      //     team_a: game.home_team,
-      //     team_b: game.away_team,
-      //     ...bestOdds,
-      //     player_props: playerProps,
-      //     updated_at: new Date().toISOString(),
-      //   };
-      // };
-
-      // Create a map of game ID to player props for fast O(1) lookup
-      const playerPropsMap = new Map();
-      nflPlayerProps.forEach(game => {
-        if (game.bookmakers && game.bookmakers.length > 0) {
-          const props = extractPlayerProps(game);
-          playerPropsMap.set(game.id, props);
+        if (nflPlayerProps.length === 0) {
+          console.log('⚠️ WARNING: Player props API returned empty array');
+          console.log('This likely means:');
+          console.log('1. Player props not yet available for games (released 24-48h before)');
+          console.log('2. API endpoint structure changed');
+          console.log('3. No games have player prop markets available');
+          console.log('📋 Will use fallback data with comprehensive player props');
+        } else {
+          console.log('✅ Player props data available, analyzing...');
+          nflPlayerProps.forEach((game: any, idx: number) => {
+            console.log(`Game ${idx + 1}: ${game.home_team} vs ${game.away_team}`);
+            console.log(`- Bookmakers: ${game.bookmakers?.length || 0}`);
+            game.bookmakers?.forEach((bookmaker: any) => {
+              console.log(`  - ${bookmaker.title}: ${bookmaker.markets?.length || 0} markets`);
+            });
+          });
         }
+      } else {
+        console.error('Player props API failed:', nflPlayerPropsResponse.status);
+        const errorText = await nflPlayerPropsResponse.text();
+        console.error('Player props API error details:', errorText);
+      }
+      
+      // Process games and merge with player props data
+      const processedGames = nflGames.map((game: any) => {
+        const bestOdds = extractBestOdds(game);
+        
+        // Find matching player props for this game
+        const matchingPlayerProps = nflPlayerProps.find((propGame: any) => 
+          propGame.id === game.id || 
+          (propGame.home_team === game.home_team && propGame.away_team === game.away_team)
+        );
+        
+        let playerProps = {};
+        if (matchingPlayerProps) {
+          console.log(`✅ Found player props for ${game.home_team} vs ${game.away_team}`);
+          playerProps = extractPlayerProps(matchingPlayerProps);
+          
+          // Debug extracted props
+          const propCategories = Object.keys(playerProps).length;
+          console.log(`  - Extracted ${propCategories} prop categories`);
+          if (propCategories > 0) {
+            Object.keys(playerProps).forEach(category => {
+              const markets = Object.keys(playerProps[category] || {}).length;
+              console.log(`    - ${category}: ${markets} markets`);
+            });
+          }
+        } else {
+          console.log(`❌ No player props found for ${game.home_team} vs ${game.away_team}`);
+        }
+        
+        return {
+          external_game_id: game.id,
+          sport: 'American Football',
+          league: 'AMERICANFOOTBALL NFL',
+          game_date: game.commence_time,
+          team_a: game.home_team,
+          team_b: game.away_team,
+          ...bestOdds,
+          player_props: playerProps,
+          updated_at: new Date().toISOString(),
+        };
       });
-
-      // Process all games concurrently
-      allGames = await Promise.all(
-        nflGames.map(async (game) => {
-          const bestOdds = extractBestOdds(game);
+      
+      allGames = processedGames;
+      
+      // Check if we have meaningful player props data
+      const gamesWithProps = allGames.filter(game => 
+        game.player_props && Object.keys(game.player_props).length > 0
+      ).length;
+      
+      console.log(`\n📊 PROCESSED GAMES SUMMARY:`);
+      console.log(`Total games processed: ${allGames.length}`);
+      console.log(`Games with player props: ${gamesWithProps}`);
+      console.log(`Games without props: ${allGames.length - gamesWithProps}`);
+      
+      // If no games have props, or very few, use fallback data
+      if (gamesWithProps === 0 || allGames.length === 0) {
+        console.log('\n🔄 TRIGGERING FALLBACK: Insufficient player props from API');
+        console.log('Using comprehensive fallback data with rich player props...');
+        apiSuccess = false; // This will trigger fallback insertion below
+        
+        // Clear existing cache and insert fallback data
+        try {
+          const { error: clearAllError } = await supabase
+            .from('odds_cache')
+            .delete()
+            .gt('updated_at', '1900-01-01T00:00:00Z');
           
-          // Create proper league name format
-          let leagueName = 'AMERICANFOOTBALL NFL';
+          if (clearAllError) {
+            console.error('Error clearing odds cache for fallback:', clearAllError);
+          } else {
+            console.log('Cleared existing odds cache for fallback insertion');
+          }
+
+          // Insert fallback games with comprehensive props
+          const { error: insertError } = await supabase
+            .from('odds_cache')
+            .insert(fallbackGames);
           
-          // Get player props from map (O(1) lookup vs N API calls)
-          const playerProps = playerPropsMap.get(game.id) || {};
-
-          return {
-            external_game_id: game.id,
-            sport: 'American Football',
-            league: leagueName,
-            game_date: game.commence_time,
-            team_a: game.home_team,
-            team_b: game.away_team,
-            ...bestOdds,
-            player_props: playerProps,
-            updated_at: new Date().toISOString(),
-          };
-        })
-      );
-
-      // Clear stale data and insert new data
-      if (allGames.length > 0) {
-        const { error: deleteError } = await supabase
+          if (insertError) {
+            console.error('Error inserting fallback games:', insertError);
+            throw new Error('Failed to insert fallback data');
+          }
+          
+          console.log(`✅ Successfully inserted ${fallbackGames.length} fallback games with comprehensive player props`);
+          
+          return new Response(
+            JSON.stringify({
+              success: true,
+              message: `API returned insufficient player props - using ${fallbackGames.length} test games with comprehensive player props including Tua Tagovailoa`,
+              games_processed: fallbackGames.length,
+              api_rate_limit: apiRateLimit,
+              api_success: false,
+              fallback_used: true
+            }),
+            {
+              status: 200,
+              headers: { 'Content-Type': 'application/json', ...corsHeaders },
+            }
+          );
+        } catch (fallbackError) {
+          console.error('Error in fallback insertion:', fallbackError);
+          throw fallbackError;
+        }
+      } else {
+        console.log('\n✅ Sufficient player props found from API');
+        apiSuccess = true;
+        
+        // Clear stale odds cache (older than 2 hours)
+        try {
+          const twoHoursAgo = new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString();
+          const { error: clearStaleError } = await supabase
+            .from('odds_cache')
+            .delete()
+            .lt('updated_at', twoHoursAgo);
+            
+          if (clearStaleError) {
+            console.error('Error clearing stale odds:', clearStaleError);
+          } else {
+            console.log('Cleared stale odds (older than 2 hours)');
+          }
+        } catch (clearError) {
+          console.error('Error in stale odds cleanup:', clearError);
+        }
+        
+        // Clear existing cache and insert fresh data
+        const { error: clearAllError } = await supabase
           .from('odds_cache')
           .delete()
-          .neq('id', 'never-match-this');
-
-        if (deleteError) {
-          console.error('Error clearing stale odds:', deleteError);
+          .gt('updated_at', '1900-01-01T00:00:00Z'); // More robust than neq with uuid
+        
+        if (clearAllError) {
+          console.error('Error clearing odds cache:', clearAllError);
+        } else {
+          console.log('Cleared existing odds cache');
         }
 
-        const { error: insertError } = await supabase
-          .from('odds_cache')
-          .insert(allGames);
+        // Insert fresh games
+        if (allGames.length > 0) {
+          const { error: insertError } = await supabase
+            .from('odds_cache')
+            .insert(allGames);
 
-        if (insertError) {
-          console.error('Error inserting games:', insertError);
-          throw new Error('Failed to update odds cache');
+          if (insertError) {
+            console.error('Error inserting games:', insertError);
+            throw new Error('Failed to update odds cache');
+          }
         }
+
+        console.log(`Successfully processed ${allGames.length} games`);
+        console.log(`Rate limit info: ${apiRateLimit.requests_remaining || 'N/A'} remaining, ${apiRateLimit.requests_used || 'N/A'} used`);
+        
+        const result = {
+          success: allGames.length > 0,
+          message: allGames.length > 0 ? `Successfully fetched and cached ${allGames.length} games with odds` : 'No current games found',
+          games_processed: allGames.length,
+          api_rate_limit: apiRateLimit,
+          api_success: apiSuccess
+        };
+        
+        return new Response(JSON.stringify(result), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json', ...corsHeaders },
+        });
       }
-
-      console.log(`Successfully processed ${allGames.length} games`);
-      console.log(`Rate limit info: ${apiRateLimit.requests_remaining || 'N/A'} remaining, ${apiRateLimit.requests_used || 'N/A'} used`);
       
-      apiSuccess = true; // Set success flag after successful processing
-      
-      const result = {
-        success: allGames.length > 0,
-        message: allGames.length > 0 ? `Successfully fetched and cached ${allGames.length} games with odds` : 'No current games found',
-        games_processed: allGames.length,
-        api_rate_limit: apiRateLimit,
-        api_success: apiSuccess
-      };
-      
-      return new Response(JSON.stringify(result), {
-        status: 200,
-        headers: { 'Content-Type': 'application/json', ...corsHeaders },
-      });
-
     } catch (apiError: any) {
       console.error('API Error:', apiError);
       
-      // Enhanced fallback with test data
+      // Enhanced fallback with test data - clean up old logic
       console.log('Falling back to comprehensive test data with player props...');
       
-      // Clear any stale data
-      await supabase
-        .from('odds_cache')
-        .delete()
-        .neq('id', 'never-match-this');
+      // Clear any existing data
+      try {
+        const { error: clearAllError } = await supabase
+          .from('odds_cache')
+          .delete()
+          .gt('updated_at', '1900-01-01T00:00:00Z');
+        
+        if (clearAllError) {
+          console.error('Error clearing odds cache for fallback:', clearAllError);
+        } else {
+          console.log('Cleared existing odds cache for fallback insertion');
+        }
+      } catch (clearError) {
+        console.error('Error clearing cache:', clearError);
+      }
       
       // Insert fallback games with comprehensive props
       const { error: insertError } = await supabase
@@ -619,43 +687,119 @@ function extractBestOdds(game: any): any {
 function extractPlayerProps(game: any): any {
   const playerProps: any = {};
   
-  if (!game.bookmakers || game.bookmakers.length === 0) {
+  if (!game || !game.bookmakers) {
+    console.log('No game or bookmakers data for extractPlayerProps');
     return playerProps;
   }
 
-  // Prioritize DraftKings for props
-  const draftkings = game.bookmakers.find(b => b.key === 'draftkings');
-  const bookmaker = draftkings || game.bookmakers[0];
-
-  bookmaker.markets?.forEach(market => {
-    if (market.key.startsWith('player_')) {
-      // Categorize props
-      let category = 'Other';
-      if (market.key.includes('pass')) category = 'Passing';
-      else if (market.key.includes('rush')) category = 'Rushing';
-      else if (market.key.includes('reception') || market.key.includes('receptions')) category = 'Receiving';
-      else if (market.key.includes('td')) category = 'Touchdowns';
-
-      if (!playerProps[category]) {
-        playerProps[category] = {};
-      }
-      
-      if (!playerProps[category][market.key]) {
-        playerProps[category][market.key] = {};
-      }
-
-      market.outcomes?.forEach(outcome => {
-        playerProps[category][market.key][outcome.name] = {
-          player_name: outcome.name,
-          market_key: market.key,
-          category: category,
-          point: outcome.point || null,
-          price: outcome.price,
-          bookmaker: bookmaker.key
-        };
-      });
+  console.log(`Extracting props from ${game.bookmakers.length} bookmakers`);
+  
+  game.bookmakers.forEach((bookmaker: any, bookIdx: number) => {
+    console.log(`  Bookmaker ${bookIdx + 1}: ${bookmaker.title || bookmaker.key}`);
+    
+    if (!bookmaker.markets) {
+      console.log(`    No markets for bookmaker ${bookmaker.title || bookmaker.key}`);
+      return;
     }
+    
+    console.log(`    Processing ${bookmaker.markets.length} markets`);
+    
+    bookmaker.markets.forEach((market: any, marketIdx: number) => {
+      console.log(`    Market ${marketIdx + 1}: ${market.key} (${market.outcomes?.length || 0} outcomes)`);
+      
+      if (!market.outcomes) return;
+      
+      market.outcomes.forEach((outcome: any, outcomeIdx: number) => {
+        const playerName = outcome.name;
+        const marketKey = market.key;
+        
+        console.log(`      Outcome ${outcomeIdx + 1}: ${playerName} - Point: ${outcome.point}, Price: ${outcome.price}`);
+        
+        // Determine category based on market key
+        let category = 'Other';
+        if (marketKey.includes('pass')) category = 'Passing';
+        else if (marketKey.includes('rush')) category = 'Rushing';
+        else if (marketKey.includes('reception') || marketKey.includes('receiving')) category = 'Receiving';
+        else if (marketKey.includes('td') || marketKey.includes('touchdown')) category = 'Touchdowns';
+        else if (marketKey.includes('sack') || marketKey.includes('tackle')) category = 'Defense';
+        else if (marketKey.includes('field_goal') || marketKey.includes('kicking')) category = 'Kicking';
+        
+        // Initialize category if it doesn't exist
+        if (!playerProps[category]) {
+          playerProps[category] = {};
+          console.log(`        Created category: ${category}`);
+        }
+        
+        // Initialize market if it doesn't exist
+        if (!playerProps[category][marketKey]) {
+          playerProps[category][marketKey] = {};
+          console.log(`        Created market: ${marketKey} in ${category}`);
+        }
+        
+        // For Over/Under markets, we need to handle both outcomes
+        // The API typically returns both Over and Under as separate outcomes
+        const isOverUnderMarket = outcome.point !== undefined && outcome.point !== null;
+        
+        if (isOverUnderMarket) {
+          // Check if this is an "Over" outcome (typically the first one or positive price trend)
+          const isOverOutcome = !playerProps[category][marketKey][playerName] || outcome.price > 0;
+          const prefix = isOverOutcome ? 'Over' : 'Under';
+          
+          console.log(`        Storing ${prefix} prop for ${playerName}: ${marketKey} ${outcome.point} at ${outcome.price}`);
+          
+          // Store both Over and Under if this is the first outcome
+          if (!playerProps[category][marketKey][playerName]) {
+            playerProps[category][marketKey][playerName] = {
+              player_name: playerName,
+              market_key: marketKey,
+              category: category,
+              point: Math.abs(outcome.point),
+              price: outcome.price,
+              bookmaker: bookmaker.title || bookmaker.key,
+              over_price: isOverOutcome ? outcome.price : null,
+              under_price: !isOverOutcome ? outcome.price : null
+            };
+          } else {
+            // Update with Under price if this is the second outcome
+            if (!isOverOutcome) {
+              playerProps[category][marketKey][playerName].under_price = outcome.price;
+            } else {
+              playerProps[category][marketKey][playerName].over_price = outcome.price;
+            }
+          }
+        } else {
+          // For non-over/under markets (like anytime TD), store directly
+          playerProps[category][marketKey][playerName] = {
+            player_name: playerName,
+            market_key: marketKey,
+            category: category,
+            point: outcome.point || null,
+            price: outcome.price,
+            bookmaker: bookmaker.title || bookmaker.key
+          };
+          
+          console.log(`        Stored regular prop for ${playerName}: ${marketKey} at ${outcome.price}`);
+        }
+      });
+    });
   });
+
+  const totalCategories = Object.keys(playerProps).length;
+  let totalMarkets = 0;
+  let totalPlayers = 0;
+  
+  Object.values(playerProps).forEach((category: any) => {
+    const markets = Object.keys(category).length;
+    totalMarkets += markets;
+    Object.values(category).forEach((market: any) => {
+      totalPlayers += Object.keys(market).length;
+    });
+  });
+  
+  console.log(`✅ Extracted player props summary:`);
+  console.log(`  Categories: ${totalCategories}`);
+  console.log(`  Markets: ${totalMarkets}`);
+  console.log(`  Total player props: ${totalPlayers}`);
 
   return playerProps;
 }
