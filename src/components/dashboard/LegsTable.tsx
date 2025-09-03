@@ -58,7 +58,7 @@ export const LegsTable = ({ legs, onRefresh }: LegsTableProps) => {
         <TableHeader>
           <TableRow>
             <TableHead>Game</TableHead>
-            <TableHead>Market</TableHead>
+            <TableHead>Player/Market</TableHead>
             <TableHead>Selection</TableHead>
             <TableHead>Odds</TableHead>
             <TableHead>Bookmaker</TableHead>
@@ -78,7 +78,21 @@ export const LegsTable = ({ legs, onRefresh }: LegsTableProps) => {
                 </div>
               </TableCell>
               <TableCell>
-                <Badge variant="outline">{leg.market_key}</Badge>
+                <div>
+                  {leg.player_name ? (
+                    <>
+                      <div className="font-medium">{leg.player_name}</div>
+                      <div className="text-sm text-muted-foreground flex items-center gap-2">
+                        <Badge variant="outline" className="text-xs">
+                          {leg.prop_category}
+                        </Badge>
+                        <span>{leg.market_key?.replace('player_', '').replace(/_/g, ' ')}</span>
+                      </div>
+                    </>
+                  ) : (
+                    <Badge variant="outline">{leg.market_key}</Badge>
+                  )}
+                </div>
               </TableCell>
               <TableCell>
                 <div className="font-medium">{leg.selection}</div>

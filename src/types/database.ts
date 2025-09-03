@@ -17,6 +17,9 @@ export interface Leg {
   bookmaker: string;
   notes?: string;
   status: 'PENDING' | 'OK' | 'DUPLICATE' | 'CONFLICT' | 'REJECTED';
+  player_name?: string;
+  prop_type?: string;
+  prop_category?: string;
   created_at: string;
   updated_at: string;
 }

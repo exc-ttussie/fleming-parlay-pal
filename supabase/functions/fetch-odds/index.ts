@@ -53,6 +53,36 @@ const fallbackGames = [
     total_over_odds: -110,
     total_under: 42.5,
     total_under_odds: -110,
+    player_props: {
+      'Passing': {
+        'player_pass_yds': {
+          'Patrick Mahomes': { player_name: 'Patrick Mahomes', market_key: 'player_pass_yds', category: 'Passing', point: 275.5, price: -110, bookmaker: 'draftkings' },
+          'Josh Allen': { player_name: 'Josh Allen', market_key: 'player_pass_yds', category: 'Passing', point: 267.5, price: -115, bookmaker: 'draftkings' }
+        },
+        'player_pass_tds': {
+          'Patrick Mahomes': { player_name: 'Patrick Mahomes', market_key: 'player_pass_tds', category: 'Passing', point: 1.5, price: -125, bookmaker: 'draftkings' },
+          'Josh Allen': { player_name: 'Josh Allen', market_key: 'player_pass_tds', category: 'Passing', point: 1.5, price: -105, bookmaker: 'draftkings' }
+        }
+      },
+      'Rushing': {
+        'player_rush_yds': {
+          'Josh Allen': { player_name: 'Josh Allen', market_key: 'player_rush_yds', category: 'Rushing', point: 42.5, price: -110, bookmaker: 'draftkings' },
+          'Isiah Pacheco': { player_name: 'Isiah Pacheco', market_key: 'player_rush_yds', category: 'Rushing', point: 67.5, price: -115, bookmaker: 'draftkings' }
+        }
+      },
+      'Receiving': {
+        'player_reception_yds': {
+          'Travis Kelce': { player_name: 'Travis Kelce', market_key: 'player_reception_yds', category: 'Receiving', point: 67.5, price: -120, bookmaker: 'draftkings' },
+          'Stefon Diggs': { player_name: 'Stefon Diggs', market_key: 'player_reception_yds', category: 'Receiving', point: 74.5, price: -110, bookmaker: 'draftkings' }
+        }
+      },
+      'Touchdowns': {
+        'player_anytime_td': {
+          'Travis Kelce': { player_name: 'Travis Kelce', market_key: 'player_anytime_td', category: 'Touchdowns', point: null, price: 120, bookmaker: 'draftkings' },
+          'Stefon Diggs': { player_name: 'Stefon Diggs', market_key: 'player_anytime_td', category: 'Touchdowns', point: null, price: 135, bookmaker: 'draftkings' }
+        }
+      }
+    },
     updated_at: new Date().toISOString(),
   },
   {
@@ -72,6 +102,20 @@ const fallbackGames = [
     total_over_odds: -105,
     total_under: 38.5,
     total_under_odds: -115,
+    player_props: {
+      'Passing': {
+        'player_pass_yds': {
+          'Dak Prescott': { player_name: 'Dak Prescott', market_key: 'player_pass_yds', category: 'Passing', point: 245.5, price: -110, bookmaker: 'draftkings' },
+          'Jalen Hurts': { player_name: 'Jalen Hurts', market_key: 'player_pass_yds', category: 'Passing', point: 225.5, price: -115, bookmaker: 'draftkings' }
+        }
+      },
+      'Rushing': {
+        'player_rush_yds': {
+          'Jalen Hurts': { player_name: 'Jalen Hurts', market_key: 'player_rush_yds', category: 'Rushing', point: 47.5, price: -110, bookmaker: 'draftkings' },
+          'Ezekiel Elliott': { player_name: 'Ezekiel Elliott', market_key: 'player_rush_yds', category: 'Rushing', point: 52.5, price: -105, bookmaker: 'draftkings' }
+        }
+      }
+    },
     updated_at: new Date().toISOString(),
   }
 ];
@@ -87,7 +131,16 @@ const handler = async (req: Request): Promise<Response> => {
     
     // Focus on NFL-only sports for better performance and lower API costs
     const sports = ['americanfootball_nfl', 'americanfootball_nfl_preseason'];
-    const markets = 'h2h,spreads,totals';
+    const basicMarkets = 'h2h,spreads,totals';
+    
+    // NFL Player prop markets available from The Odds API
+    const playerPropMarkets = [
+      'player_pass_yds', 'player_pass_tds', 'player_pass_completions', 'player_pass_attempts',
+      'player_pass_interceptions', 'player_rush_yds', 'player_rush_tds', 'player_rush_attempts',
+      'player_receptions', 'player_reception_yds', 'player_reception_tds', 'player_anytime_td',
+      'player_1st_td', 'player_sacks', 'player_tackles_assists', 'player_field_goals',
+      'player_kicking_points', 'player_pass_rush_reception_yds', 'player_rush_reception_yds'
+    ].join(',');
     
     let allGames: any[] = [];
     let apiSuccess = false;
@@ -97,7 +150,7 @@ const handler = async (req: Request): Promise<Response> => {
       try {
         console.log(`Fetching ${sport} odds...`);
         
-        const apiUrl = `https://api.the-odds-api.com/v4/sports/${sport}/odds/?apiKey=${oddsApiKey}&regions=us&markets=${markets}&oddsFormat=american`;
+        const apiUrl = `https://api.the-odds-api.com/v4/sports/${sport}/odds/?apiKey=${oddsApiKey}&regions=us&markets=${basicMarkets}&oddsFormat=american`;
         console.log(`API URL: ${apiUrl.replace(oddsApiKey, '[HIDDEN]')}`);
         
         const response = await fetch(apiUrl);
@@ -137,6 +190,27 @@ const handler = async (req: Request): Promise<Response> => {
             leagueName = 'AMERICANFOOTBALL NFL PRESEASON';
           }
           
+          // Fetch player props for this specific game
+          let playerProps = {};
+          try {
+            console.log(`Fetching player props for game: ${game.id}`);
+            const playerPropsUrl = `https://api.the-odds-api.com/v4/sports/${sport}/events/${game.id}/odds/?apiKey=${oddsApiKey}&regions=us&markets=${playerPropMarkets}&oddsFormat=american`;
+            const playerPropsResponse = await fetch(playerPropsUrl);
+            
+            if (playerPropsResponse.ok) {
+              const playerPropsData = await playerPropsResponse.json();
+              playerProps = extractPlayerProps(playerPropsData);
+              console.log(`Fetched ${Object.keys(playerProps).length} player prop categories for ${game.home_team} vs ${game.away_team}`);
+            } else {
+              console.log(`No player props available for ${game.home_team} vs ${game.away_team}`);
+            }
+            
+            // Rate limiting between player prop calls
+            await new Promise(resolve => setTimeout(resolve, 500));
+          } catch (error) {
+            console.error(`Error fetching player props for game ${game.id}:`, error);
+          }
+          
           allGames.push({
             external_game_id: game.id,
             sport: game.sport_title,
@@ -154,6 +228,7 @@ const handler = async (req: Request): Promise<Response> => {
             total_over_odds: bestOdds.total.over_odds,
             total_under: bestOdds.total.under_line,
             total_under_odds: bestOdds.total.under_odds,
+            player_props: playerProps,
             updated_at: new Date().toISOString(),
           });
         }
@@ -311,6 +386,67 @@ function extractBestOdds(game: OddsResponse) {
   }
   
   return bestOdds;
+}
+
+function extractPlayerProps(gameData: any) {
+  const playerProps: any = {};
+  
+  if (!gameData?.bookmakers) return playerProps;
+  
+  // Organize props by category for better UI display
+  const propCategories: { [key: string]: string } = {
+    'player_pass_yds': 'Passing',
+    'player_pass_tds': 'Passing',
+    'player_pass_completions': 'Passing',
+    'player_pass_attempts': 'Passing',
+    'player_pass_interceptions': 'Passing',
+    'player_rush_yds': 'Rushing',
+    'player_rush_tds': 'Rushing',
+    'player_rush_attempts': 'Rushing',
+    'player_receptions': 'Receiving',
+    'player_reception_yds': 'Receiving',
+    'player_reception_tds': 'Receiving',
+    'player_anytime_td': 'Touchdowns',
+    'player_1st_td': 'Touchdowns',
+    'player_sacks': 'Defense',
+    'player_tackles_assists': 'Defense',
+    'player_field_goals': 'Kicking',
+    'player_kicking_points': 'Kicking',
+    'player_pass_rush_reception_yds': 'Combined',
+    'player_rush_reception_yds': 'Combined'
+  };
+  
+  // Process each bookmaker (prefer DraftKings)
+  for (const bookmaker of gameData.bookmakers) {
+    const isPreferred = bookmaker.key === 'draftkings';
+    
+    for (const market of bookmaker.markets) {
+      const category = propCategories[market.key];
+      if (!category) continue;
+      
+      if (!playerProps[category]) playerProps[category] = {};
+      if (!playerProps[category][market.key]) playerProps[category][market.key] = {};
+      
+      // Extract player-specific props
+      for (const outcome of market.outcomes) {
+        const playerName = outcome.name;
+        
+        if (!playerProps[category][market.key][playerName] || isPreferred) {
+          playerProps[category][market.key][playerName] = {
+            player_name: playerName,
+            market_key: market.key,
+            category: category,
+            point: outcome.point || null,
+            price: outcome.price,
+            bookmaker: bookmaker.key,
+            description: outcome.description || outcome.name
+          };
+        }
+      }
+    }
+  }
+  
+  return playerProps;
 }
 
 serve(handler);

@@ -27,6 +27,9 @@ export type Database = {
           line: number | null
           market_key: string
           notes: string | null
+          player_name: string | null
+          prop_category: string | null
+          prop_type: string | null
           selection: string
           source: string
           sport_key: string
@@ -47,6 +50,9 @@ export type Database = {
           line?: number | null
           market_key: string
           notes?: string | null
+          player_name?: string | null
+          prop_category?: string | null
+          prop_type?: string | null
           selection: string
           source: string
           sport_key: string
@@ -67,6 +73,9 @@ export type Database = {
           line?: number | null
           market_key?: string
           notes?: string | null
+          player_name?: string | null
+          prop_category?: string | null
+          prop_type?: string | null
           selection?: string
           source?: string
           sport_key?: string
@@ -94,6 +103,7 @@ export type Database = {
           league: string
           moneyline_away: number | null
           moneyline_home: number | null
+          player_props: Json | null
           sport: string
           spread_away: number | null
           spread_away_odds: number | null
@@ -115,6 +125,7 @@ export type Database = {
           league: string
           moneyline_away?: number | null
           moneyline_home?: number | null
+          player_props?: Json | null
           sport: string
           spread_away?: number | null
           spread_away_odds?: number | null
@@ -136,6 +147,7 @@ export type Database = {
           league?: string
           moneyline_away?: number | null
           moneyline_home?: number | null
+          player_props?: Json | null
           sport?: string
           spread_away?: number | null
           spread_away_odds?: number | null

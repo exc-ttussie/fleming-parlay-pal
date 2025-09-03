@@ -20,7 +20,9 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import { toast } from 'sonner';
-import { Loader2, RefreshCw, TrendingUp } from 'lucide-react';
+import { Input } from '@/components/ui/input';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Search, User, BarChart3, Loader2, RefreshCw, TrendingUp } from 'lucide-react';
 import { americanToDecimal } from '@/lib/parlay';
 
 interface Game {
@@ -41,15 +43,37 @@ interface Game {
   total_over_odds: number | null;
   total_under: number | null;
   total_under_odds: number | null;
+  player_props: PlayerPropsData;
   updated_at: string;
 }
 
+interface PlayerProp {
+  player_name: string;
+  market_key: string;
+  category: string;
+  point: number | null;
+  price: number;
+  bookmaker: string;
+  description?: string;
+}
+
+interface PlayerPropsData {
+  [category: string]: {
+    [market_key: string]: {
+      [player_name: string]: PlayerProp;
+    };
+  };
+}
+
 interface BetOption {
-  type: 'moneyline' | 'spread' | 'total';
+  type: 'moneyline' | 'spread' | 'total' | 'player_prop';
   selection: string;
   odds: number;
   line?: number;
   description: string;
+  player_name?: string;
+  prop_type?: string;
+  prop_category?: string;
 }
 
 interface EnhancedCreateLegModalProps {
@@ -71,6 +95,9 @@ export const EnhancedCreateLegModal = ({
   const [games, setGames] = useState<Game[]>([]);
   const [selectedGame, setSelectedGame] = useState<Game | null>(null);
   const [selectedBet, setSelectedBet] = useState<BetOption | null>(null);
+  const [activeTab, setActiveTab] = useState<'game' | 'props'>('game');
+  const [selectedCategory, setSelectedCategory] = useState<string>('');
+  const [playerSearch, setPlayerSearch] = useState<string>('');
 
   // Fetch available games
   const fetchGames = async () => {
@@ -116,7 +143,10 @@ export const EnhancedCreateLegModal = ({
       }
       
       console.log(`Fetched ${data?.length || 0} NFL games from cache`);
-      setGames(data || []);
+      setGames((data || []).map(game => ({
+        ...game,
+        player_props: (game.player_props as unknown as PlayerPropsData) || {}
+      })));
       
       if (!data || data.length === 0) {
         toast.error('No NFL games available. Please try again later or contact support if the issue persists.');
@@ -202,6 +232,74 @@ export const EnhancedCreateLegModal = ({
     return options;
   };
 
+  // Get player prop options for selected game
+  const getPlayerPropOptions = (game: Game): BetOption[] => {
+    const options: BetOption[] = [];
+    
+    if (!game.player_props) return options;
+
+    Object.entries(game.player_props).forEach(([category, markets]) => {
+      // Filter by selected category if one is selected
+      if (selectedCategory && category !== selectedCategory) return;
+
+      Object.entries(markets).forEach(([marketKey, players]) => {
+        Object.entries(players).forEach(([playerName, prop]) => {
+          // Filter by player search if search term exists
+          if (playerSearch && !playerName.toLowerCase().includes(playerSearch.toLowerCase())) return;
+
+          const description = prop.point 
+            ? `${playerName} ${formatPropName(marketKey)} ${prop.point > 0 ? 'Over' : 'Under'} ${Math.abs(prop.point)}`
+            : `${playerName} ${formatPropName(marketKey)}`;
+
+          options.push({
+            type: 'player_prop',
+            selection: description,
+            odds: prop.price,
+            line: prop.point,
+            description,
+            player_name: playerName,
+            prop_type: marketKey,
+            prop_category: category
+          });
+        });
+      });
+    });
+
+    return options.sort((a, b) => (a.player_name || '').localeCompare(b.player_name || ''));
+  };
+
+  // Format prop names for display
+  const formatPropName = (marketKey: string): string => {
+    const formatMap: { [key: string]: string } = {
+      'player_pass_yds': 'Passing Yards',
+      'player_pass_tds': 'Passing TDs',
+      'player_pass_completions': 'Completions',
+      'player_pass_attempts': 'Pass Attempts',
+      'player_pass_interceptions': 'Interceptions',
+      'player_rush_yds': 'Rushing Yards',
+      'player_rush_tds': 'Rushing TDs',
+      'player_rush_attempts': 'Rush Attempts',
+      'player_receptions': 'Receptions',
+      'player_reception_yds': 'Receiving Yards',
+      'player_reception_tds': 'Receiving TDs',
+      'player_anytime_td': 'Anytime TD',
+      'player_1st_td': 'First TD',
+      'player_sacks': 'Sacks',
+      'player_tackles_assists': 'Tackles + Assists',
+      'player_field_goals': 'Field Goals',
+      'player_kicking_points': 'Kicking Points',
+      'player_pass_rush_reception_yds': 'Pass + Rush + Rec Yards',
+      'player_rush_reception_yds': 'Rush + Rec Yards'
+    };
+    return formatMap[marketKey] || marketKey.replace(/_/g, ' ');
+  };
+
+  // Get available categories for current game
+  const getAvailableCategories = (game: Game): string[] => {
+    if (!game.player_props) return [];
+    return Object.keys(game.player_props);
+  };
+
   const handleSubmitLeg = async () => {
     if (!user || !selectedGame || !selectedBet) {
       toast.error('Please select a game and bet');
@@ -231,24 +329,33 @@ export const EnhancedCreateLegModal = ({
 
       const decimalOdds = americanToDecimal(selectedBet.odds);
 
+      const legData: any = {
+        user_id: user.id,
+        week_id: weekId,
+        sport_key: selectedGame.sport.toLowerCase().replace(' ', '_'),
+        league: selectedGame.league,
+        game_id: selectedGame.external_game_id,
+        game_desc: `${selectedGame.team_a} vs ${selectedGame.team_b}`,
+        market_key: selectedBet.type === 'player_prop' ? selectedBet.prop_type : selectedBet.type,
+        selection: selectedBet.selection,
+        line: selectedBet.line,
+        american_odds: selectedBet.odds,
+        decimal_odds: decimalOdds,
+        source: 'odds_api',
+        bookmaker: 'DraftKings',
+        status: 'PENDING'
+      };
+
+      // Add player prop specific fields
+      if (selectedBet.type === 'player_prop') {
+        legData.player_name = selectedBet.player_name;
+        legData.prop_type = selectedBet.prop_type;
+        legData.prop_category = selectedBet.prop_category;
+      }
+
       const { error } = await supabase
         .from('legs')
-        .insert({
-          user_id: user.id,
-          week_id: weekId,
-          sport_key: selectedGame.sport.toLowerCase().replace(' ', '_'),
-          league: selectedGame.league,
-          game_id: selectedGame.external_game_id,
-          game_desc: `${selectedGame.team_a} vs ${selectedGame.team_b}`,
-          market_key: selectedBet.type,
-          selection: selectedBet.selection,
-          line: selectedBet.line,
-          american_odds: selectedBet.odds,
-          decimal_odds: decimalOdds,
-          source: 'odds_api',
-          bookmaker: 'DraftKings',
-          status: 'PENDING'
-        });
+        .insert(legData);
 
       if (error) {
         if (error.code === '23505' && error.message?.includes('unique_user_week_leg')) {
@@ -265,6 +372,9 @@ export const EnhancedCreateLegModal = ({
       // Reset selections
       setSelectedGame(null);
       setSelectedBet(null);
+      setActiveTab('game');
+      setSelectedCategory('');
+      setPlayerSearch('');
       
     } catch (error: any) {
       console.error('Error creating leg:', error);
@@ -315,79 +425,179 @@ export const EnhancedCreateLegModal = ({
                   </div>
                 ) : (
                   games.map((game) => (
-                  <Card 
-                    key={game.id}
-                    className={`cursor-pointer transition-colors ${
-                      selectedGame?.id === game.id ? 'ring-2 ring-primary bg-accent' : 'hover:bg-accent/50'
-                    }`}
-                    onClick={() => setSelectedGame(game)}
-                  >
-                    <CardContent className="p-4">
-                      <div className="flex items-center justify-between">
-                        <div className="flex-1">
-                          <div className="font-semibold text-lg">
-                            {game.team_a} vs {game.team_b}
+                    <Card 
+                      key={game.id}
+                      className={`cursor-pointer transition-colors ${
+                        selectedGame?.id === game.id ? 'ring-2 ring-primary bg-accent' : 'hover:bg-accent/50'
+                      }`}
+                      onClick={() => {
+                        setSelectedGame(game);
+                        setSelectedBet(null);
+                        setActiveTab('game');
+                        setSelectedCategory('');
+                        setPlayerSearch('');
+                      }}
+                    >
+                      <CardContent className="p-4">
+                        <div className="flex items-center justify-between">
+                          <div className="flex-1">
+                            <div className="font-semibold text-lg">
+                              {game.team_a} vs {game.team_b}
+                            </div>
+                            <div className="text-sm text-muted-foreground">
+                              {new Date(game.game_date).toLocaleDateString('en-US', { 
+                                weekday: 'short', 
+                                month: 'short', 
+                                day: 'numeric' 
+                              })} at{' '}
+                              {new Date(game.game_date).toLocaleTimeString([], { 
+                                hour: '2-digit', 
+                                minute: '2-digit' 
+                              })}
+                            </div>
                           </div>
-                          <div className="text-sm text-muted-foreground">
-                            {new Date(game.game_date).toLocaleDateString('en-US', { 
-                              weekday: 'short', 
-                              month: 'short', 
-                              day: 'numeric' 
-                            })} at{' '}
-                            {new Date(game.game_date).toLocaleTimeString([], { 
-                              hour: '2-digit', 
-                              minute: '2-digit' 
-                            })}
+                          <div className="text-right">
+                            <Badge variant="outline" className="bg-gradient-to-r from-blue-600 to-red-600 text-white border-0">
+                              NFL
+                            </Badge>
                           </div>
                         </div>
-                        <div className="text-right">
-                          <Badge variant="outline" className="bg-gradient-to-r from-blue-600 to-red-600 text-white border-0">
-                            NFL
-                          </Badge>
-                        </div>
-                      </div>
-                    </CardContent>
+                      </CardContent>
                     </Card>
                   ))
                 )}
               </div>
             </div>
 
-            {/* Bet Options */}
+            {/* Betting Options */}
             {selectedGame && (
               <div className="space-y-4">
                 <Separator />
-                <h3 className="text-lg font-semibold">Available Bets</h3>
-                <div className="grid gap-3">
-                  {getBetOptions(selectedGame).map((bet, index) => (
-                    <Card
-                      key={index}
-                      className={`cursor-pointer transition-colors ${
-                        selectedBet === bet ? 'ring-2 ring-primary bg-accent' : 'hover:bg-accent/50'
-                      }`}
-                      onClick={() => setSelectedBet(bet)}
-                    >
-                      <CardContent className="p-4">
-                        <div className="flex items-center justify-between">
-                          <div>
-                            <div className="font-medium">{bet.description}</div>
-                            <div className="text-sm text-muted-foreground capitalize">
-                              {bet.type} bet
+                <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as 'game' | 'props')}>
+                  <TabsList className="grid w-full grid-cols-2">
+                    <TabsTrigger value="game" className="flex items-center gap-2">
+                      <BarChart3 className="h-4 w-4" />
+                      Game Props
+                    </TabsTrigger>
+                    <TabsTrigger value="props" className="flex items-center gap-2">
+                      <User className="h-4 w-4" />
+                      Player Props
+                    </TabsTrigger>
+                  </TabsList>
+
+                  <TabsContent value="game" className="space-y-4">
+                    <h3 className="text-lg font-semibold">Game Betting Options</h3>
+                    <div className="grid gap-3">
+                      {getBetOptions(selectedGame).map((bet, index) => (
+                        <Card
+                          key={index}
+                          className={`cursor-pointer transition-colors ${
+                            selectedBet === bet ? 'ring-2 ring-primary bg-accent' : 'hover:bg-accent/50'
+                          }`}
+                          onClick={() => setSelectedBet(bet)}
+                        >
+                          <CardContent className="p-4">
+                            <div className="flex items-center justify-between">
+                              <div>
+                                <div className="font-medium">{bet.description}</div>
+                                <div className="text-sm text-muted-foreground capitalize">
+                                  {bet.type} bet
+                                </div>
+                              </div>
+                              <div className="text-right">
+                                <div className="font-semibold text-lg">
+                                  {formatOdds(bet.odds)}
+                                </div>
+                                <Badge variant="outline" className="text-xs">
+                                  DraftKings
+                                </Badge>
+                              </div>
                             </div>
-                          </div>
-                          <div className="text-right">
-                            <div className="font-semibold text-lg">
-                              {formatOdds(bet.odds)}
-                            </div>
-                            <Badge variant="outline" className="text-xs">
-                              DraftKings
-                            </Badge>
-                          </div>
+                          </CardContent>
+                        </Card>
+                      ))}
+                    </div>
+                  </TabsContent>
+
+                  <TabsContent value="props" className="space-y-4">
+                    <div className="flex items-center justify-between">
+                      <h3 className="text-lg font-semibold">Player Props</h3>
+                      <div className="flex items-center gap-2">
+                        <div className="relative">
+                          <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
+                          <Input
+                            placeholder="Search players..."
+                            value={playerSearch}
+                            onChange={(e) => setPlayerSearch(e.target.value)}
+                            className="pl-8 w-64"
+                          />
                         </div>
-                      </CardContent>
-                    </Card>
-                  ))}
-                </div>
+                      </div>
+                    </div>
+
+                    {/* Category Filter */}
+                    {getAvailableCategories(selectedGame).length > 0 && (
+                      <div className="space-y-2">
+                        <Label className="text-sm font-medium">Filter by Category</Label>
+                        <Select value={selectedCategory} onValueChange={setSelectedCategory}>
+                          <SelectTrigger className="w-full">
+                            <SelectValue placeholder="All Categories" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="">All Categories</SelectItem>
+                            {getAvailableCategories(selectedGame).map((category) => (
+                              <SelectItem key={category} value={category}>
+                                {category}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    )}
+
+                    {/* Player Props List */}
+                    <div className="grid gap-3 max-h-96 overflow-y-auto">
+                      {getPlayerPropOptions(selectedGame).length === 0 ? (
+                        <div className="text-center py-8 text-muted-foreground">
+                          <p>No player props available for this game.</p>
+                          <p className="text-sm mt-2">Try selecting a different game or clearing filters.</p>
+                        </div>
+                      ) : (
+                        getPlayerPropOptions(selectedGame).map((bet, index) => (
+                          <Card
+                            key={index}
+                            className={`cursor-pointer transition-colors ${
+                              selectedBet === bet ? 'ring-2 ring-primary bg-accent' : 'hover:bg-accent/50'
+                            }`}
+                            onClick={() => setSelectedBet(bet)}
+                          >
+                            <CardContent className="p-4">
+                              <div className="flex items-center justify-between">
+                                <div className="flex-1">
+                                  <div className="font-medium">{bet.description}</div>
+                                  <div className="text-sm text-muted-foreground flex items-center gap-2">
+                                    <Badge variant="secondary" className="text-xs">
+                                      {bet.prop_category}
+                                    </Badge>
+                                    <span>{bet.player_name}</span>
+                                  </div>
+                                </div>
+                                <div className="text-right">
+                                  <div className="font-semibold text-lg">
+                                    {formatOdds(bet.odds)}
+                                  </div>
+                                  <Badge variant="outline" className="text-xs">
+                                    DraftKings
+                                  </Badge>
+                                </div>
+                              </div>
+                            </CardContent>
+                          </Card>
+                        ))
+                      )}
+                    </div>
+                  </TabsContent>
+                </Tabs>
               </div>
             )}
 
@@ -407,6 +617,11 @@ export const EnhancedCreateLegModal = ({
                     <div>
                       <span className="font-medium">Odds:</span> {formatOdds(selectedBet.odds)}
                     </div>
+                    {selectedBet.type === 'player_prop' && (
+                      <div>
+                        <span className="font-medium">Category:</span> {selectedBet.prop_category}
+                      </div>
+                    )}
                     <div>
                       <span className="font-medium">Stake:</span> $10.00 (group parlay)
                     </div>
