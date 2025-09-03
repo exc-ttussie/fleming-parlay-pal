@@ -229,12 +229,22 @@ const handler = async (req: Request): Promise<Response> => {
       if (remainingRequests) apiRateLimit.requests_remaining = parseInt(remainingRequests);
       if (usedRequests) apiRateLimit.requests_used = parseInt(usedRequests);
 
-      // Check responses and parse data concurrently
+      // Check responses with detailed error handling
       if (!nflResponse.ok) {
-        throw new Error(`NFL API request failed: ${nflResponse.status}`);
+        const errorText = await nflResponse.text();
+        console.error(`NFL API Error ${nflResponse.status}:`, errorText);
+        if (nflResponse.status === 401) {
+          throw new Error(`API Authentication Failed (401): Invalid or missing ODDS_API_KEY. Please check your API key configuration.`);
+        }
+        throw new Error(`NFL API request failed: ${nflResponse.status} - ${errorText}`);
       }
       if (!preseasonResponse.ok) {
-        throw new Error(`Preseason API request failed: ${preseasonResponse.status}`);
+        const errorText = await preseasonResponse.text();
+        console.error(`Preseason API Error ${preseasonResponse.status}:`, errorText);
+        if (preseasonResponse.status === 401) {
+          throw new Error(`API Authentication Failed (401): Invalid or missing ODDS_API_KEY. Please check your API key configuration.`);
+        }
+        throw new Error(`Preseason API request failed: ${preseasonResponse.status} - ${errorText}`);
       }
 
       const [nflGames, preseasonGames, nflPlayerProps, preseasonPlayerProps] = await Promise.all([
@@ -400,11 +410,30 @@ const handler = async (req: Request): Promise<Response> => {
     } catch (error) {
       console.error('Error fetching from API:', error);
       apiSuccess = false;
+      
+      // Don't use fallback for authentication errors - user needs to fix API key
+      if (error instanceof Error && error.message.includes('Authentication Failed')) {
+        return new Response(
+          JSON.stringify({ 
+            success: false, 
+            error: error.message,
+            games_processed: 0,
+            fix_required: 'Please configure a valid ODDS_API_KEY in your Supabase secrets'
+          }),
+          {
+            status: 401,
+            headers: { 'Content-Type': 'application/json', ...corsHeaders },
+          }
+        );
+      }
+      
+      // Only use fallback for network/service errors, not authentication
       allGames = [...fallbackGames];
+      console.log('Using fallback data due to API service error (not authentication)');
     }
     
-    // If no games were fetched from API, use fallback data
-    if (!apiSuccess || allGames.length === 0) {
+    // If no games were fetched from API, use fallback data (only for non-auth errors)
+    if (!apiSuccess && allGames.length === 0) {
       console.log('No games from API, using fallback data');
       allGames = [...fallbackGames];
     }
