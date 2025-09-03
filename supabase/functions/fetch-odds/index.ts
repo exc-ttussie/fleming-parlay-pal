@@ -469,11 +469,43 @@ function extractPlayerProps(game: any): any {
       
       if (!market.outcomes) return;
       
+      // Extract player name from the market description or first outcome's description
+      let currentPlayer = '';
+      
       market.outcomes.forEach((outcome: any, outcomeIdx: number) => {
-        const playerName = outcome.name;
+        const betType = outcome.name; // This is "Over", "Under", or "Yes"
         const marketKey = market.key;
         
-        console.log(`      Outcome ${outcomeIdx + 1}: ${playerName} - Point: ${outcome.point}, Price: ${outcome.price}`);
+        // Enhanced logging to understand actual API response structure
+        console.log(`      Outcome ${outcomeIdx + 1}: ${betType} - Point: ${outcome.point}, Price: ${outcome.price}`);
+        console.log(`        Full outcome object:`, JSON.stringify(outcome, null, 2));
+        
+        // Try to extract player name from description field
+        let playerName = '';
+        if (outcome.description) {
+          console.log(`        Description: ${outcome.description}`);
+          playerName = outcome.description;
+        } else if (outcome.participant_name) {
+          playerName = outcome.participant_name;
+        } else if (outcome.player_name) {
+          playerName = outcome.player_name;
+        } else {
+          // If no player info in outcome, try to extract from market name or use a placeholder
+          playerName = `Player_${outcomeIdx + 1}`;
+        }
+        
+        // Clean up player name if it contains extra information
+        if (playerName && typeof playerName === 'string') {
+          // Remove common suffixes that might be in the description
+          playerName = playerName.replace(/\s+(Over|Under|Yes|No)\s*$/gi, '').trim();
+        }
+        
+        if (!playerName) {
+          console.log(`        Warning: No player name found for outcome ${outcomeIdx + 1}`);
+          return;
+        }
+        
+        console.log(`        Extracted player name: "${playerName}"`);
         
         // Determine category based on market key
         let category = 'Other';
@@ -496,49 +528,39 @@ function extractPlayerProps(game: any): any {
           console.log(`        Created market: ${marketKey} in ${category}`);
         }
         
-        // For Over/Under markets, we need to handle both outcomes
-        // The API typically returns both Over and Under as separate outcomes
-        const isOverUnderMarket = outcome.point !== undefined && outcome.point !== null;
-        
-        if (isOverUnderMarket) {
-          // Check if this is an "Over" outcome (typically the first one or positive price trend)
-          const isOverOutcome = !playerProps[category][marketKey][playerName] || outcome.price > 0;
-          const prefix = isOverOutcome ? 'Over' : 'Under';
-          
-          console.log(`        Storing ${prefix} prop for ${playerName}: ${marketKey} ${outcome.point} at ${outcome.price}`);
-          
-          // Store both Over and Under if this is the first outcome
-          if (!playerProps[category][marketKey][playerName]) {
-            playerProps[category][marketKey][playerName] = {
-              player_name: playerName,
-              market_key: marketKey,
-              category: category,
-              point: Math.abs(outcome.point),
-              price: outcome.price,
-              bookmaker: bookmaker.title || bookmaker.key,
-              over_price: isOverOutcome ? outcome.price : null,
-              under_price: !isOverOutcome ? outcome.price : null
-            };
-          } else {
-            // Update with Under price if this is the second outcome
-            if (!isOverOutcome) {
-              playerProps[category][marketKey][playerName].under_price = outcome.price;
-            } else {
-              playerProps[category][marketKey][playerName].over_price = outcome.price;
-            }
-          }
-        } else {
-          // For non-over/under markets (like anytime TD), store directly
+        // Initialize player if it doesn't exist
+        if (!playerProps[category][marketKey][playerName]) {
           playerProps[category][marketKey][playerName] = {
             player_name: playerName,
             market_key: marketKey,
             category: category,
-            point: outcome.point || null,
-            price: outcome.price,
-            bookmaker: bookmaker.title || bookmaker.key
+            bookmaker: bookmaker.title || bookmaker.key,
+            over_price: null,
+            under_price: null,
+            point: null,
+            yes_price: null
           };
-          
-          console.log(`        Stored regular prop for ${playerName}: ${marketKey} at ${outcome.price}`);
+        }
+        
+        // Store the outcome based on bet type
+        const playerData = playerProps[category][marketKey][playerName];
+        
+        if (betType === 'Over') {
+          playerData.over_price = outcome.price;
+          playerData.point = outcome.point;
+          console.log(`        Stored Over prop for ${playerName}: ${marketKey} ${outcome.point || ''} at ${outcome.price}`);
+        } else if (betType === 'Under') {
+          playerData.under_price = outcome.price;
+          if (!playerData.point) playerData.point = outcome.point;
+          console.log(`        Stored Under prop for ${playerName}: ${marketKey} ${outcome.point || ''} at ${outcome.price}`);
+        } else if (betType === 'Yes') {
+          playerData.yes_price = outcome.price;
+          console.log(`        Stored Yes prop for ${playerName}: ${marketKey} at ${outcome.price}`);
+        } else {
+          // For other bet types, store as generic price
+          playerData.price = outcome.price;
+          if (outcome.point) playerData.point = outcome.point;
+          console.log(`        Stored ${betType} prop for ${playerName}: ${marketKey} at ${outcome.price}`);
         }
       });
     });
