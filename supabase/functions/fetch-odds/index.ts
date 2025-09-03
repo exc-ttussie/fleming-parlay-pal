@@ -184,46 +184,71 @@ const fallbackGames = [
 ];
 
 const handler = async (req: Request): Promise<Response> => {
+  // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
   }
 
   try {
-    console.log('Starting optimized NFL odds fetch...');
-    console.log('API Key available:', !!oddsApiKey);
+    console.log('Starting optimized NFL odds fetch for current season...');
     
-    const basicMarkets = 'h2h,spreads,totals';
-    const playerPropMarkets = [
-      'player_pass_yds', 'player_pass_tds', 'player_pass_completions', 'player_pass_attempts',
-      'player_pass_interceptions', 'player_rush_yds', 'player_rush_tds', 'player_rush_attempts',
-      'player_receptions', 'player_reception_yds', 'player_reception_tds', 'player_anytime_td',
-      'player_1st_td', 'player_sacks', 'player_tackles_assists', 'player_field_goals',
-      'player_kicking_points', 'player_pass_rush_reception_yds', 'player_rush_reception_yds'
-    ].join(',');
+    const oddsApiKey = Deno.env.get('ODDS_API_KEY');
+    console.log('API Key available:', !!oddsApiKey);
+    console.log('API Key length:', oddsApiKey ? oddsApiKey.length : 0);
+    
+    if (!oddsApiKey) {
+      console.log('CRITICAL: No ODDS_API_KEY found in environment variables');
+      return new Response(
+        JSON.stringify({ 
+          success: false, 
+          error: 'Configuration Error', 
+          message: 'ODDS_API_KEY not configured. Please add your API key from theoddsapi.com',
+          games_processed: 0 
+        }),
+        {
+          status: 500,
+          headers: { 'Content-Type': 'application/json', ...corsHeaders },
+        }
+      );
+    }
+    
+    // Define sport keys for current NFL season (playoffs/regular season)
+    const sportKeys = ['americanfootball_nfl'];  // Focus on main NFL season, skip preseason in January
     
     let allGames: any[] = [];
     let apiSuccess = false;
     let apiRateLimit = { requests_remaining: null, requests_used: null };
     
     try {
-      console.log('Starting concurrent API calls...');
+      console.log('Starting concurrent API calls for next 14 days...');
       
-      // Fetch all data concurrently - major performance improvement
-      const [nflResponse, preseasonResponse, nflPlayerPropsResponse, preseasonPlayerPropsResponse] = await Promise.all([
-        // Regular season games
-        fetch(`https://api.the-odds-api.com/v4/sports/americanfootball_nfl/odds/?apiKey=${oddsApiKey}&regions=us&markets=${basicMarkets}&oddsFormat=american&bookmakers=draftkings,fanduel,betmgm,caesars`),
-        
-        // Preseason games  
-        fetch(`https://api.the-odds-api.com/v4/sports/americanfootball_nfl_preseason/odds/?apiKey=${oddsApiKey}&regions=us&markets=${basicMarkets}&oddsFormat=american&bookmakers=draftkings,fanduel,betmgm,caesars`),
+      // Calculate date range for current/upcoming games (14 days)
+      const today = new Date();
+      const twoWeeksFromNow = new Date(today.getTime() + (14 * 24 * 60 * 60 * 1000));
+      const commenceTimeFrom = today.toISOString();
+      const commenceTimeTo = twoWeeksFromNow.toISOString();
+      
+      console.log(`Fetching games from ${commenceTimeFrom} to ${commenceTimeTo}...`);
+      
+      const basicMarkets = 'h2h,spreads,totals';
+      const playerPropMarkets = [
+        'player_pass_yds', 'player_pass_tds', 'player_pass_completions', 'player_pass_attempts',
+        'player_pass_interceptions', 'player_rush_yds', 'player_rush_tds', 'player_rush_attempts',
+        'player_receptions', 'player_reception_yds', 'player_reception_tds', 'player_anytime_td',
+        'player_1st_td', 'player_sacks', 'player_tackles_assists', 'player_field_goals',
+        'player_kicking_points', 'player_pass_rush_reception_yds', 'player_rush_reception_yds'
+      ].join(',');
+      
+      // Fetch all data concurrently for current NFL season only
+      const [nflResponse, nflPlayerPropsResponse] = await Promise.all([
+        // Regular season/playoff games (next 14 days)
+        fetch(`https://api.the-odds-api.com/v4/sports/americanfootball_nfl/odds/?apiKey=${oddsApiKey}&regions=us&markets=${basicMarkets}&oddsFormat=american&bookmakers=draftkings,fanduel,betmgm,caesars&commenceTimeFrom=${commenceTimeFrom}&commenceTimeTo=${commenceTimeTo}`),
         
         // NFL player props (bulk fetch - huge performance gain)
-        fetch(`https://api.the-odds-api.com/v4/sports/americanfootball_nfl/odds/?apiKey=${oddsApiKey}&regions=us&markets=${playerPropMarkets}&oddsFormat=american&bookmakers=draftkings,fanduel,betmgm,caesars,betonlineag`),
-        
-        // NFL Preseason player props (bulk fetch)
-        fetch(`https://api.the-odds-api.com/v4/sports/americanfootball_nfl_preseason/odds/?apiKey=${oddsApiKey}&regions=us&markets=${playerPropMarkets}&oddsFormat=american&bookmakers=draftkings,fanduel,betmgm,caesars,betonlineag`)
+        fetch(`https://api.the-odds-api.com/v4/sports/americanfootball_nfl/odds/?apiKey=${oddsApiKey}&regions=us&markets=${playerPropMarkets}&oddsFormat=american&bookmakers=draftkings,fanduel,betmgm,caesars,betonlineag&commenceTimeFrom=${commenceTimeFrom}&commenceTimeTo=${commenceTimeTo}`)
       ]);
 
-      // Extract rate limit info from first response
+      // Extract rate limit info from response
       const remainingRequests = nflResponse.headers.get('x-requests-remaining');
       const usedRequests = nflResponse.headers.get('x-requests-used');
       if (remainingRequests) apiRateLimit.requests_remaining = parseInt(remainingRequests);
@@ -233,49 +258,43 @@ const handler = async (req: Request): Promise<Response> => {
       if (!nflResponse.ok) {
         const errorText = await nflResponse.text();
         console.error(`NFL API Error ${nflResponse.status}:`, errorText);
+        
+        // Enhanced error messages for common issues
         if (nflResponse.status === 401) {
-          throw new Error(`API Authentication Failed (401): Invalid or missing ODDS_API_KEY. Please check your API key configuration.`);
+          const errorObj = JSON.parse(errorText || '{}');
+          if (errorObj?.error_code === 'MISSING_KEY') {
+            throw new Error(`API Authentication Failed (401): Invalid or missing ODDS_API_KEY. Please check your API key configuration.`);
+          } else if (errorObj?.error_code === 'QUOTA_EXCEEDED') {
+            throw new Error(`API Quota Exceeded (401): You have reached your API request limit. Please upgrade your plan or wait for quota reset.`);
+          } else {
+            throw new Error(`API Authentication Failed (401): ${errorText}`);
+          }
         }
+        
         throw new Error(`NFL API request failed: ${nflResponse.status} - ${errorText}`);
       }
-      if (!preseasonResponse.ok) {
-        const errorText = await preseasonResponse.text();
-        console.error(`Preseason API Error ${preseasonResponse.status}:`, errorText);
-        if (preseasonResponse.status === 401) {
-          throw new Error(`API Authentication Failed (401): Invalid or missing ODDS_API_KEY. Please check your API key configuration.`);
-        }
-        throw new Error(`Preseason API request failed: ${preseasonResponse.status} - ${errorText}`);
-      }
 
-      const [nflGames, preseasonGames, nflPlayerProps, preseasonPlayerProps] = await Promise.all([
+      const [nflGames, nflPlayerProps] = await Promise.all([
         nflResponse.json(),
-        preseasonResponse.json(),
-        nflPlayerPropsResponse.ok ? nflPlayerPropsResponse.json() : [],
-        preseasonPlayerPropsResponse.ok ? preseasonPlayerPropsResponse.json() : []
+        nflPlayerPropsResponse.ok ? nflPlayerPropsResponse.json() : []
       ]);
 
-      console.log(`Fetched ${nflGames.length} NFL games and ${preseasonGames.length} preseason games`);
-      console.log(`Fetched player props for ${nflPlayerProps.length + preseasonPlayerProps.length} games`);
+      console.log(`Fetched ${nflGames.length} NFL games in next 14 days`);
+      console.log(`Fetched player props for ${nflPlayerProps.length} games`);
       
-      // ENHANCED DEBUGGING: Log detailed API response analysis
+      // ENHANCED DEBUGGING: Log detailed API response analysis for current NFL games
       let propsCount = 0;
       let gamesWithProps = 0;
-      let gamesWithin48Hours = 0;
-      let gamesWithPropsWithin48Hours = 0;
       
       // Debug function to analyze each game's prop availability
       const analyzeGameProps = (games: any[], gameType: string) => {
         games.forEach((game, index) => {
           const gameTime = new Date(game.commence_time);
           const hoursUntilGame = (gameTime.getTime() - Date.now()) / (1000 * 60 * 60);
-          const isWithin48Hours = hoursUntilGame <= 48;
-          
-          if (isWithin48Hours) gamesWithin48Hours++;
           
           console.log(`\n=== ${gameType.toUpperCase()} GAME ${index + 1}: ${game.home_team} vs ${game.away_team} ===`);
           console.log(`Game ID: ${game.id}`);
           console.log(`Kickoff: ${game.commence_time} (${Math.round(hoursUntilGame)}h from now)`);
-          console.log(`Within 48h: ${isWithin48Hours ? 'YES' : 'NO'}`);
           
           if (game.bookmakers && game.bookmakers.length > 0) {
             console.log(`Bookmakers available: ${game.bookmakers.length}`);
@@ -298,7 +317,6 @@ const handler = async (req: Request): Promise<Response> => {
                 });
                 
                 gamesWithProps++;
-                if (isWithin48Hours) gamesWithPropsWithin48Hours++;
               } else {
                 console.log(`    NO MARKETS for ${bookmaker.title}`);
               }
@@ -306,46 +324,28 @@ const handler = async (req: Request): Promise<Response> => {
           } else {
             console.log(`NO BOOKMAKERS for this game`);
           }
-          
-          // Special attention to Dolphins games
-          if (game.home_team?.includes('Dolphins') || game.away_team?.includes('Dolphins')) {
-            console.log(`🐬 DOLPHINS GAME DETECTED! ${game.home_team} vs ${game.away_team}`);
-            console.log(`🐬 Hours until kickoff: ${Math.round(hoursUntilGame)}`);
-            console.log(`🐬 Bookmakers: ${game.bookmakers?.length || 0}`);
-            console.log(`🐬 Total markets: ${game.bookmakers?.reduce((sum: number, bm: any) => sum + (bm.markets?.length || 0), 0) || 0}`);
-          }
         });
       };
       
       console.log('\n📊 ANALYZING NFL PLAYER PROPS API RESPONSE:');
       analyzeGameProps(nflPlayerProps, 'nfl');
       
-      console.log('\n📊 ANALYZING NFL PRESEASON PLAYER PROPS API RESPONSE:');
-      analyzeGameProps(preseasonPlayerProps, 'preseason');
-      
       console.log(`\n🔢 SUMMARY STATS:`);
-      console.log(`Total games analyzed: ${nflPlayerProps.length + preseasonPlayerProps.length}`);
-      console.log(`Games within 48h: ${gamesWithin48Hours}`);
+      console.log(`Total games analyzed: ${nflPlayerProps.length}`);
       console.log(`Games with any props: ${gamesWithProps}`);
-      console.log(`Games with props within 48h: ${gamesWithPropsWithin48Hours}`);
       console.log(`Total prop markets found: ${propsCount}`);
       
-      if (gamesWithProps === 0) {
-        console.log('\n❌ CRITICAL: No player props found for ANY games!');
-        console.log('This suggests an issue with:');
-        console.log('1. API endpoint URLs');
-        console.log('2. Market key parameters');
-        console.log('3. Bookmaker availability'); 
-        console.log('4. API response format changes');
-      } else if (gamesWithPropsWithin48Hours === 0 && gamesWithin48Hours > 0) {
-        console.log('\n⚠️  WARNING: Games within 48h exist but have no props - this is unusual');
+      if (gamesWithProps === 0 && nflGames.length > 0) {
+        console.log('\n❌ CRITICAL: Games found but no player props available!');
+        console.log('This suggests:');
+        console.log('1. Games might be too far in advance for props');
+        console.log('2. Props might not be available yet for playoff games');
+        console.log('3. API response format might have changed');
       }
       
-      apiSuccess = true;
-
       // Combine all games
-      const allBasicGames = [...nflGames, ...preseasonGames];
-      const allPlayerProps = [...nflPlayerProps, ...preseasonPlayerProps];
+      const allBasicGames = [...nflGames];
+      const allPlayerProps = [...nflPlayerProps];
 
       // Create a map of game ID to player props for fast O(1) lookup
       const playerPropsMap = new Map();
@@ -366,9 +366,7 @@ const handler = async (req: Request): Promise<Response> => {
           
           // Create proper league name format
           let leagueName = 'AMERICANFOOTBALL NFL';
-          if (game.sport_key === 'americanfootball_nfl_preseason') {
-            leagueName = 'AMERICANFOOTBALL NFL PRESEASON';
-          }
+          // All games are now from main NFL season (no preseason in January)
           
           // Get player props from map (O(1) lookup vs N API calls)
           const playerProps = playerPropsMap.get(game.id) || {};
@@ -443,15 +441,16 @@ const handler = async (req: Request): Promise<Response> => {
       );
     }
     
-    // If no games were fetched from API, return error instead of fallback
+    // If no games were fetched from API, provide more helpful messaging
     if (!apiSuccess && allGames.length === 0) {
-      console.log('No games available from API - no fallback to test games');
+      console.log('No games available from API in the next 14 days');
       return new Response(
         JSON.stringify({ 
           success: false, 
-          error: 'No Games Available', 
-          message: 'No real game data available from API.',
-          games_processed: 0 
+          error: 'No Upcoming Games', 
+          message: 'No NFL games found in the next 14 days. This could be during NFL offseason or all games may have completed.',
+          games_processed: 0,
+          suggestion: 'NFL playoffs run through early February. Regular season starts in September.'
         }),
         {
           status: 404,

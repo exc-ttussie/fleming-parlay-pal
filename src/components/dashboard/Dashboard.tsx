@@ -223,13 +223,32 @@ export const Dashboard = () => {
               <div className="flex items-center space-x-2">
                 <TrendingUp className="w-4 h-4 text-muted-foreground" />
                 <div>
-                  <p className="text-sm text-muted-foreground">Potential Payout</p>
-                  <p className="font-medium">{parlay ? formatCurrency(parlay.projectedPayout) : '$0'}</p>
+                  <p className="text-sm text-muted-foreground">
+                    {currentWeek && currentWeek.week_number >= 19 ? 'NFL Playoffs' : 'NFL Week'}
+                  </p>
+                  <p className="font-medium">
+                    Week {currentWeek?.week_number}
+                  </p>
                 </div>
               </div>
             </CardContent>
           </Card>
         </div>
+
+        {/* Data Status Information */}
+        <Card>
+          <CardContent className="p-4">
+            <div className="text-center text-muted-foreground">
+              <p className="text-sm mb-2">
+                📊 Real-time NFL odds powered by The Odds API
+              </p>
+              <p className="text-xs">
+                Current season: {currentWeek && currentWeek.week_number >= 19 ? '2024-25 NFL Playoffs' : '2024-25 NFL Season'} • 
+                Updated continuously for next 14 days of games
+              </p>
+            </div>
+          </CardContent>
+        </Card>
 
         {/* Your Status */}
         <Card>

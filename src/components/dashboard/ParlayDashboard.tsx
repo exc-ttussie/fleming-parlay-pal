@@ -82,23 +82,58 @@ export const ParlayDashboard = () => {
     try {
       toast({
         title: "Fetching Odds",
-        description: "Updating latest odds data...",
+        description: "Updating latest NFL odds data...",
       });
 
       const { data, error } = await supabase.functions.invoke('fetch-odds');
       
       if (error) throw error;
       
+      // Handle different response scenarios
+      if (data?.success === false) {
+        // API returned structured error response
+        if (data.error === 'Configuration Error') {
+          toast({
+            title: "Configuration Required",
+            description: data.message || "API key needs to be configured",
+            variant: "destructive",
+          });
+        } else if (data.error === 'No Upcoming Games') {
+          toast({
+            title: "No Games Available",
+            description: data.message + (data.suggestion ? ` ${data.suggestion}` : ''),
+            variant: "destructive",
+          });
+        } else if (data.error === 'API Quota Exceeded') {
+          toast({
+            title: "API Limit Reached", 
+            description: "Daily API quota exceeded. Please wait for reset or upgrade plan.",
+            variant: "destructive",
+          });
+        } else {
+          toast({
+            title: data.error || "Error",
+            description: data.message || "Failed to fetch odds data",
+            variant: "destructive",
+          });
+        }
+        return;
+      }
+      
+      // Success case
+      const gamesProcessed = data?.games_processed || 0;
       toast({
         title: "Success",
-        description: `Odds updated! Processed ${data.games_processed} games`,
+        description: gamesProcessed > 0 
+          ? `Odds updated! Processed ${gamesProcessed} games` 
+          : "Odds fetch completed - no new games found",
       });
       
     } catch (error: any) {
       console.error('Error fetching odds:', error);
       toast({
         title: "Error",
-        description: "Failed to fetch odds",
+        description: error.message || "Failed to fetch odds",
         variant: "destructive",
       });
     }
