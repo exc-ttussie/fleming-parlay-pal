@@ -6,6 +6,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuthContext } from "@/components/AuthProvider";
 import { signOut } from "@/lib/auth";
 import { formatCurrency, americanToDecimal, parlayDecimal, parlayPayout } from "@/lib/parlay";
+import { getNextSundayLockTime } from "@/lib/dateUtils";
 import { Clock, Users, DollarSign, TrendingUp, LogOut } from "lucide-react";
 import { LegsTable } from "./LegsTable";
 import { EnhancedCreateLegModal } from "./EnhancedCreateLegModal";
@@ -120,9 +121,7 @@ export const Dashboard = () => {
   }, []);
 
   const getTimeUntilLock = () => {
-    if (!currentWeek) return '';
-    
-    const lockTime = new Date(currentWeek.locks_at);
+    const lockTime = getNextSundayLockTime();
     const now = new Date();
     const diff = lockTime.getTime() - now.getTime();
     

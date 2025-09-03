@@ -7,6 +7,7 @@ import { Leg, Week } from '@/types/database';
 import { toast } from 'sonner';
 import { Users, Clock, Target, TrendingUp } from 'lucide-react';
 import { formatCurrency, parlayDecimal, parlayPayout } from '@/lib/parlay';
+import { getNextSundayLockTime } from '@/lib/dateUtils';
 
 interface LegWithProfile extends Leg {
   safe_profiles?: { name: string; team_name?: string } | null;
@@ -91,10 +92,8 @@ export const GroupCoordination = () => {
   const parlayCalculation = calculateParlay();
   
   const getTimeUntilLock = () => {
-    if (!currentWeek) return 'No active week';
-    
+    const lockTime = getNextSundayLockTime();
     const now = new Date();
-    const lockTime = new Date(currentWeek.locks_at);
     const timeDiff = lockTime.getTime() - now.getTime();
     
     if (timeDiff <= 0) return 'Locked';
