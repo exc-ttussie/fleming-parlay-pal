@@ -86,7 +86,7 @@ const handler = async (req: Request): Promise<Response> => {
       
       const basicMarkets = 'h2h,spreads,totals';
       
-      // Player prop markets available in The Odds API
+      // Player prop markets available in The Odds API - using correct market keys
       const playerPropMarkets = [
         'player_pass_yds',
         'player_pass_tds', 
@@ -100,7 +100,7 @@ const handler = async (req: Request): Promise<Response> => {
         'player_reception_yds',
         'player_reception_tds',
         'player_anytime_td',
-        'player_first_td',
+        'player_1st_td',         // Fixed: was 'player_first_td'
         'player_last_td'
       ];
       
