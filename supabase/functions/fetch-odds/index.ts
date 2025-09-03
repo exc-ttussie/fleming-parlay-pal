@@ -126,14 +126,10 @@ const handler = async (req: Request): Promise<Response> => {
   }
 
   try {
-    console.log('Starting NFL odds fetch...');
+    console.log('Starting optimized NFL odds fetch...');
     console.log('API Key available:', !!oddsApiKey);
     
-    // Focus on NFL-only sports for better performance and lower API costs
-    const sports = ['americanfootball_nfl', 'americanfootball_nfl_preseason'];
     const basicMarkets = 'h2h,spreads,totals';
-    
-    // NFL Player prop markets available from The Odds API
     const playerPropMarkets = [
       'player_pass_yds', 'player_pass_tds', 'player_pass_completions', 'player_pass_attempts',
       'player_pass_interceptions', 'player_rush_yds', 'player_rush_tds', 'player_rush_attempts',
@@ -146,72 +142,79 @@ const handler = async (req: Request): Promise<Response> => {
     let apiSuccess = false;
     let apiRateLimit = { requests_remaining: null, requests_used: null };
     
-    for (const sport of sports) {
-      try {
-        console.log(`Fetching ${sport} odds...`);
+    try {
+      console.log('Starting concurrent API calls...');
+      
+      // Fetch all data concurrently - major performance improvement
+      const [nflResponse, preseasonResponse, nflPlayerPropsResponse, preseasonPlayerPropsResponse] = await Promise.all([
+        // Regular season games
+        fetch(`https://api.the-odds-api.com/v4/sports/americanfootball_nfl/odds/?apiKey=${oddsApiKey}&regions=us&markets=${basicMarkets}&oddsFormat=american&bookmakers=draftkings,fanduel,betmgm,caesars`),
         
-        const apiUrl = `https://api.the-odds-api.com/v4/sports/${sport}/odds/?apiKey=${oddsApiKey}&regions=us&markets=${basicMarkets}&oddsFormat=american`;
-        console.log(`API URL: ${apiUrl.replace(oddsApiKey, '[HIDDEN]')}`);
+        // Preseason games  
+        fetch(`https://api.the-odds-api.com/v4/sports/americanfootball_nfl_preseason/odds/?apiKey=${oddsApiKey}&regions=us&markets=${basicMarkets}&oddsFormat=american&bookmakers=draftkings,fanduel,betmgm,caesars`),
         
-        const response = await fetch(apiUrl);
+        // NFL player props (bulk fetch - huge performance gain)
+        fetch(`https://api.the-odds-api.com/v4/sports/americanfootball_nfl/odds/?apiKey=${oddsApiKey}&regions=us&markets=${playerPropMarkets}&oddsFormat=american&bookmakers=draftkings,fanduel,betmgm,caesars,betonlineag`),
         
-        console.log(`API Response status for ${sport}:`, response.status);
-        
-        // Extract rate limit headers
-        const remainingRequests = response.headers.get('x-requests-remaining');
-        const usedRequests = response.headers.get('x-requests-used');
-        if (remainingRequests) apiRateLimit.requests_remaining = parseInt(remainingRequests);
-        if (usedRequests) apiRateLimit.requests_used = parseInt(usedRequests);
-        
-        if (!response.ok) {
-          const errorText = await response.text();
-          console.error(`Failed to fetch ${sport} odds:`, {
-            status: response.status,
-            statusText: response.statusText,
-            error: errorText
-          });
-          continue;
+        // NFL Preseason player props (bulk fetch)
+        fetch(`https://api.the-odds-api.com/v4/sports/americanfootball_nfl_preseason/odds/?apiKey=${oddsApiKey}&regions=us&markets=${playerPropMarkets}&oddsFormat=american&bookmakers=draftkings,fanduel,betmgm,caesars,betonlineag`)
+      ]);
+
+      // Extract rate limit info from first response
+      const remainingRequests = nflResponse.headers.get('x-requests-remaining');
+      const usedRequests = nflResponse.headers.get('x-requests-used');
+      if (remainingRequests) apiRateLimit.requests_remaining = parseInt(remainingRequests);
+      if (usedRequests) apiRateLimit.requests_used = parseInt(usedRequests);
+
+      // Check responses and parse data concurrently
+      if (!nflResponse.ok) {
+        throw new Error(`NFL API request failed: ${nflResponse.status}`);
+      }
+      if (!preseasonResponse.ok) {
+        throw new Error(`Preseason API request failed: ${preseasonResponse.status}`);
+      }
+
+      const [nflGames, preseasonGames, nflPlayerProps, preseasonPlayerProps] = await Promise.all([
+        nflResponse.json(),
+        preseasonResponse.json(),
+        nflPlayerPropsResponse.ok ? nflPlayerPropsResponse.json() : [],
+        preseasonPlayerPropsResponse.ok ? preseasonPlayerPropsResponse.json() : []
+      ]);
+
+      console.log(`Fetched ${nflGames.length} NFL games and ${preseasonGames.length} preseason games`);
+      console.log(`Fetched player props for ${nflPlayerProps.length + preseasonPlayerProps.length} games`);
+      apiSuccess = true;
+
+      // Combine all games
+      const allBasicGames = [...nflGames, ...preseasonGames];
+      const allPlayerProps = [...nflPlayerProps, ...preseasonPlayerProps];
+
+      // Create a map of game ID to player props for fast O(1) lookup
+      const playerPropsMap = new Map();
+      allPlayerProps.forEach(game => {
+        if (game.bookmakers && game.bookmakers.length > 0) {
+          playerPropsMap.set(game.id, extractPlayerProps(game));
         }
-        
-        const data: OddsResponse[] = await response.json();
-        console.log(`Successfully fetched ${data.length} games for ${sport}`);
-        apiSuccess = true;
-        
-        // Transform odds data for storage
-        for (const game of data) {
-          console.log(`Processing game: ${game.home_team} vs ${game.away_team}`);
-          
-          // Get the best odds from various bookmakers
+      });
+
+      // Process all games concurrently - another big performance gain
+      allGames = await Promise.all(
+        allBasicGames.map(async (game) => {
           const bestOdds = extractBestOdds(game);
           
           // Create proper league name format
           let leagueName = 'AMERICANFOOTBALL NFL';
-          if (sport === 'americanfootball_nfl_preseason') {
+          if (game.sport_key === 'americanfootball_nfl_preseason') {
             leagueName = 'AMERICANFOOTBALL NFL PRESEASON';
           }
           
-          // Fetch player props for this specific game
-          let playerProps = {};
-          try {
-            console.log(`Fetching player props for game: ${game.id}`);
-            const playerPropsUrl = `https://api.the-odds-api.com/v4/sports/${sport}/events/${game.id}/odds/?apiKey=${oddsApiKey}&regions=us&markets=${playerPropMarkets}&oddsFormat=american`;
-            const playerPropsResponse = await fetch(playerPropsUrl);
-            
-            if (playerPropsResponse.ok) {
-              const playerPropsData = await playerPropsResponse.json();
-              playerProps = extractPlayerProps(playerPropsData);
-              console.log(`Fetched ${Object.keys(playerProps).length} player prop categories for ${game.home_team} vs ${game.away_team}`);
-            } else {
-              console.log(`No player props available for ${game.home_team} vs ${game.away_team}`);
-            }
-            
-            // Rate limiting between player prop calls
-            await new Promise(resolve => setTimeout(resolve, 500));
-          } catch (error) {
-            console.error(`Error fetching player props for game ${game.id}:`, error);
+          // Get player props from map (O(1) lookup vs N API calls)
+          const playerProps = playerPropsMap.get(game.id) || {};
+          if (Object.keys(playerProps).length > 0) {
+            console.log(`Added player props for ${game.home_team} vs ${game.away_team}`);
           }
-          
-          allGames.push({
+
+          return {
             external_game_id: game.id,
             sport: game.sport_title,
             league: leagueName,
@@ -230,15 +233,14 @@ const handler = async (req: Request): Promise<Response> => {
             total_under_odds: bestOdds.total.under_odds,
             player_props: playerProps,
             updated_at: new Date().toISOString(),
-          });
-        }
-        
-        // Rate limiting - pause between API calls
-        await new Promise(resolve => setTimeout(resolve, 1000));
-        
-      } catch (error) {
-        console.error(`Error fetching ${sport}:`, error);
-      }
+          };
+        })
+      );
+
+    } catch (error) {
+      console.error('Error fetching from API:', error);
+      apiSuccess = false;
+      allGames = [...fallbackGames];
     }
     
     // If no games were fetched from API, use fallback data
@@ -249,9 +251,11 @@ const handler = async (req: Request): Promise<Response> => {
     
     console.log(`Total games processed: ${allGames.length}`);
     
-    // Clear old games before inserting new ones (keep cache fresh)
+    // Database operations - optimized with batching
     try {
-      console.log('Clearing old odds cache...');
+      console.log('Updating database...');
+      
+      // Clear old cache and insert new data concurrently where possible
       const { error: deleteError } = await supabase
         .from('odds_cache')
         .delete()
@@ -260,43 +264,32 @@ const handler = async (req: Request): Promise<Response> => {
       if (deleteError) {
         console.error('Error clearing old cache:', deleteError);
       }
-    } catch (clearError) {
-      console.error('Failed to clear old cache:', clearError);
-    }
-    
-    // Store odds in database
-    if (allGames.length > 0) {
-      try {
-        console.log('Inserting games into database...');
-        const { error } = await supabase
-          .from('odds_cache')
-          .upsert(allGames, { 
+
+      // Insert games in batches for better performance
+      const batchSize = 20;
+      const batches = [];
+      for (let i = 0; i < allGames.length; i += batchSize) {
+        batches.push(allGames.slice(i, i + batchSize));
+      }
+
+      console.log(`Inserting ${allGames.length} games in ${batches.length} batches...`);
+      const insertResults = await Promise.all(
+        batches.map((batch, index) => {
+          console.log(`Inserting batch ${index + 1}/${batches.length} (${batch.length} games)`);
+          return supabase.from('odds_cache').upsert(batch, { 
             onConflict: 'external_game_id',
             ignoreDuplicates: false 
           });
-        
-        if (error) {
-          console.error('Database error:', error);
-          return new Response(
-            JSON.stringify({ 
-              success: false, 
-              error: 'Database error: ' + error.message,
-              games_processed: 0 
-            }),
-            {
-              status: 500,
-              headers: { 'Content-Type': 'application/json', ...corsHeaders },
-            }
-          );
-        } else {
-          console.log('Successfully updated odds cache');
-        }
-      } catch (dbError) {
-        console.error('Failed to update database:', dbError);
+        })
+      );
+
+      const insertErrors = insertResults.filter(result => result.error);
+      if (insertErrors.length > 0) {
+        console.error('Error inserting some batches:', insertErrors);
         return new Response(
           JSON.stringify({ 
             success: false, 
-            error: 'Database connection error: ' + dbError,
+            error: 'Failed to insert some odds data',
             games_processed: 0 
           }),
           {
@@ -305,6 +298,22 @@ const handler = async (req: Request): Promise<Response> => {
           }
         );
       }
+
+      console.log('Successfully updated odds cache');
+      
+    } catch (dbError) {
+      console.error('Failed to update database:', dbError);
+      return new Response(
+        JSON.stringify({ 
+          success: false, 
+          error: 'Database connection error: ' + dbError,
+          games_processed: 0 
+        }),
+        {
+          status: 500,
+          headers: { 'Content-Type': 'application/json', ...corsHeaders },
+        }
+      );
     }
     
     return new Response(
