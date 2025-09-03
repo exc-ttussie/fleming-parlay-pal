@@ -260,7 +260,6 @@ export const EnhancedCreateLegModal = ({
         
         if (tuaPropsFound) {
           console.log('🎯 SUCCESS: Tua Tagovailoa passing yards prop is available for testing!');
-          toast.success('Found Tua\'s passing yards prop - ready for testing!');
         } else if (dolphinsGame) {
           console.log('⚠️ Dolphins game exists but no Tua props found');
         }
