@@ -86,7 +86,25 @@ const handler = async (req: Request): Promise<Response> => {
       
       const basicMarkets = 'h2h,spreads,totals';
       
-      // Fetch basic game data only - no player props for now due to API market changes
+      // Player prop markets available in The Odds API
+      const playerPropMarkets = [
+        'player_pass_yds',
+        'player_pass_tds', 
+        'player_pass_completions',
+        'player_pass_attempts',
+        'player_pass_interceptions',
+        'player_rush_yds',
+        'player_rush_attempts',
+        'player_rush_tds',
+        'player_receptions',
+        'player_reception_yds',
+        'player_reception_tds',
+        'player_anytime_td',
+        'player_first_td',
+        'player_last_td'
+      ];
+      
+      // Fetch basic game data
       const nflResponse = await fetch(
         `https://api.the-odds-api.com/v4/sports/americanfootball_nfl/odds/?apiKey=${oddsApiKey}&regions=us&markets=${basicMarkets}&oddsFormat=american&bookmakers=draftkings,fanduel,betmgm,caesars&commenceTimeFrom=${commenceTimeFrom}&commenceTimeTo=${commenceTimeTo}`
       );
@@ -184,9 +202,51 @@ const handler = async (req: Request): Promise<Response> => {
 
       console.log(`Fetched ${nflGames.length} NFL games in next 14 days`);
       
-      // Process games - basic odds only for now
-      const processedGames = nflGames.map((game: any) => {
+      // Fetch player props for each game
+      console.log('Fetching player props for games...');
+      let playerPropsSuccess = false;
+      let totalPlayerProps = 0;
+      
+      const processedGames = await Promise.all(nflGames.map(async (game: any) => {
         const bestOdds = extractBestOdds(game);
+        let gamePlayerProps = {};
+        
+        try {
+          // Fetch player props for this specific game
+          const playerPropMarketsString = playerPropMarkets.join(',');
+          const propsUrl = `https://api.the-odds-api.com/v4/sports/americanfootball_nfl/events/${game.id}/odds/?apiKey=${oddsApiKey}&regions=us&markets=${playerPropMarketsString}&oddsFormat=american&bookmakers=draftkings,fanduel,betmgm`;
+          
+          console.log(`Fetching props for ${game.home_team} vs ${game.away_team}...`);
+          
+          const propsResponse = await fetch(propsUrl);
+          
+          if (propsResponse.ok) {
+            const propsData = await propsResponse.json();
+            if (propsData && propsData.bookmakers && propsData.bookmakers.length > 0) {
+              gamePlayerProps = extractPlayerProps(propsData);
+              const propsCount = Object.values(gamePlayerProps).reduce((total: number, category: any) => {
+                return total + Object.values(category).reduce((catTotal: number, market: any) => {
+                  return catTotal + Object.keys(market).length;
+                }, 0);
+              }, 0);
+              
+              if (propsCount > 0) {
+                totalPlayerProps += propsCount;
+                playerPropsSuccess = true;
+                console.log(`  ✅ Found ${propsCount} player props for this game`);
+              } else {
+                console.log(`  ⚠️ No player props found for this game`);
+              }
+            } else {
+              console.log(`  ⚠️ Empty response for player props for this game`);
+            }
+          } else {
+            const errorText = await propsResponse.text();
+            console.log(`  ❌ Player props API error (${propsResponse.status}): ${errorText}`);
+          }
+        } catch (propsError) {
+          console.error(`  ❌ Error fetching player props for game ${game.id}:`, propsError);
+        }
         
         return {
           external_game_id: game.id,
@@ -196,15 +256,17 @@ const handler = async (req: Request): Promise<Response> => {
           team_a: game.home_team,
           team_b: game.away_team,
           ...bestOdds,
-          player_props: {}, // Empty for now - no player props available
+          player_props: gamePlayerProps,
           updated_at: new Date().toISOString(),
         };
-      });
+      }));
       
       allGames = processedGames;
       
       console.log(`\n📊 PROCESSED GAMES SUMMARY:`);
       console.log(`Total games processed: ${allGames.length}`);
+      console.log(`Total player props found: ${totalPlayerProps}`);
+      console.log(`Player props success: ${playerPropsSuccess}`);
       console.log(`Live data only - no fallback data used`);
       
       // Return error if no live games are available
@@ -269,11 +331,12 @@ const handler = async (req: Request): Promise<Response> => {
       
       return new Response(JSON.stringify({
         success: true,
-        message: `Successfully fetched and cached ${allGames.length} live NFL games (basic odds only)`,
+        message: `Successfully fetched and cached ${allGames.length} live NFL games with player props`,
         games_processed: allGames.length,
+        player_props_found: totalPlayerProps,
         api_rate_limit: apiRateLimit,
         api_success: true,
-        player_props_available: false
+        player_props_available: playerPropsSuccess
       }), {
         status: 200,
         headers: { 'Content-Type': 'application/json', ...corsHeaders },
