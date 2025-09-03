@@ -2,21 +2,26 @@ import { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
+import { Button } from '@/components/ui/button';
 import { supabase } from '@/integrations/supabase/client';
 import { Leg, Week } from '@/types/database';
 import { toast } from 'sonner';
-import { Users, Clock, Target, TrendingUp } from 'lucide-react';
+import { Users, Clock, Target, TrendingUp, Plus, CheckCircle } from 'lucide-react';
 import { formatCurrency, parlayDecimal, parlayPayout } from '@/lib/parlay';
 import { getNextSundayLockTime } from '@/lib/dateUtils';
+import { EnhancedCreateLegModal } from '@/components/dashboard/EnhancedCreateLegModal';
+import { useAuthContext } from '@/components/AuthProvider';
 
 interface LegWithProfile extends Leg {
   safe_profiles?: { name: string; team_name?: string; user_id: string } | null;
 }
 
 export const GroupCoordination = () => {
+  const { user } = useAuthContext();
   const [currentWeek, setCurrentWeek] = useState<Week | null>(null);
   const [legs, setLegs] = useState<LegWithProfile[]>([]);
   const [loading, setLoading] = useState(true);
+  const [showSubmitModal, setShowSubmitModal] = useState(false);
 
   const fetchCurrentWeek = async () => {
     try {
@@ -94,6 +99,10 @@ export const GroupCoordination = () => {
   const submittedUsers = new Set(legs.map(leg => leg.user_id)).size;
   const targetUsers = 13;
   const completionPercentage = (submittedUsers / targetUsers) * 100;
+  
+  // Check if current user has already submitted a leg
+  const userHasSubmitted = user ? legs.some(leg => leg.user_id === user.id) : false;
+  const userLeg = user ? legs.find(leg => leg.user_id === user.id) : null;
 
   const calculateParlay = () => {
     if (okLegs.length === 0) return null;
@@ -127,6 +136,13 @@ export const GroupCoordination = () => {
     return `${hours}h ${Math.floor((timeDiff % (1000 * 60 * 60)) / (1000 * 60))}m`;
   };
 
+  const handleLegCreated = () => {
+    // Refresh legs after successful submission
+    if (currentWeek) {
+      fetchLegs(currentWeek.id);
+    }
+  };
+
   if (loading) {
     return <div className="flex items-center justify-center p-8">
       <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
@@ -153,9 +169,31 @@ export const GroupCoordination = () => {
     <div className="p-6">
       <div className="flex items-center justify-between mb-6">
         <h1 className="text-3xl font-bold">Group Coordination - Week {currentWeek.week_number}</h1>
-        <Badge variant={currentWeek.status === 'OPEN' ? 'default' : 'secondary'}>
-          {currentWeek.status}
-        </Badge>
+        <div className="flex items-center gap-3">
+          {user && currentWeek.status === 'OPEN' && (
+            <Button
+              onClick={() => setShowSubmitModal(true)}
+              disabled={userHasSubmitted}
+              variant={userHasSubmitted ? "outline" : "default"}
+              size="sm"
+            >
+              {userHasSubmitted ? (
+                <>
+                  <CheckCircle className="h-4 w-4 mr-2" />
+                  Leg Submitted
+                </>
+              ) : (
+                <>
+                  <Plus className="h-4 w-4 mr-2" />
+                  Submit My Leg
+                </>
+              )}
+            </Button>
+          )}
+          <Badge variant={currentWeek.status === 'OPEN' ? 'default' : 'secondary'}>
+            {currentWeek.status}
+          </Badge>
+        </div>
       </div>
 
       {/* Status Cards */}
@@ -219,19 +257,24 @@ export const GroupCoordination = () => {
           <div className="grid gap-3">
             {legs.map((leg) => (
               <div key={leg.id} className="flex items-center justify-between p-3 bg-muted rounded-md">
-                <div className="flex items-center gap-3">
-                  <div>
-                     <p className="font-medium">
-                       {leg.safe_profiles?.name || 'Unknown User'}
-                       {leg.safe_profiles?.team_name && (
-                         <span className="text-sm text-muted-foreground ml-2">
-                           ({leg.safe_profiles.team_name})
-                         </span>
-                       )}
-                     </p>
-                    <p className="text-sm text-muted-foreground">{leg.game_desc}</p>
-                  </div>
-                </div>
+                 <div className="flex items-center gap-3">
+                   <div>
+                      <p className="font-medium">
+                        {leg.safe_profiles?.name || 'Unknown User'}
+                        {leg.safe_profiles?.team_name && (
+                          <span className="text-sm text-muted-foreground ml-2">
+                            ({leg.safe_profiles.team_name})
+                          </span>
+                        )}
+                        {user && leg.user_id === user.id && (
+                          <span className="text-xs bg-primary/10 text-primary px-2 py-1 rounded ml-2">
+                            You
+                          </span>
+                        )}
+                      </p>
+                     <p className="text-sm text-muted-foreground">{leg.game_desc}</p>
+                   </div>
+                 </div>
                 <div className="flex items-center gap-2">
                   <Badge variant={
                     leg.status === 'OK' ? 'default' :
@@ -275,6 +318,16 @@ export const GroupCoordination = () => {
             </div>
           </CardContent>
         </Card>
+      )}
+
+      {/* Leg Submission Modal */}
+      {currentWeek && (
+        <EnhancedCreateLegModal
+          open={showSubmitModal}
+          onOpenChange={setShowSubmitModal}
+          onLegCreated={handleLegCreated}
+          weekId={currentWeek.id}
+        />
       )}
     </div>
   );
