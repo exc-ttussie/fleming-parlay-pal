@@ -146,6 +146,70 @@ export const EnhancedCreateLegModal = ({
       if (gamesError) {
         console.error('Error fetching games:', gamesError);
         toast.error('Failed to fetch updated games');
+        return;
+      }
+      
+      // Check if cache is empty and attempt to populate it
+      if (!gamesData || gamesData.length === 0) {
+        console.log('⚠️ No games found in cache, calling fetch-odds function...');
+        toast.info('No games in cache, fetching fresh data...');
+        
+        try {
+          const { data: functionData, error: functionError } = await supabase.functions.invoke('fetch-odds', {});
+          
+          if (functionError) {
+            console.error('Error calling fetch-odds function:', functionError);
+            toast.error(`Failed to fetch fresh odds: ${functionError.message}`);
+            return;
+          }
+          
+          console.log('✅ Fetch-odds function response:', functionData);
+          
+          if (functionData?.success === false) {
+            console.error('Fetch-odds function returned error:', functionData.message);
+            toast.error(`Odds fetch failed: ${functionData.message || 'Unknown error'}`);
+            return;
+          }
+          
+          toast.success(`Fetched ${functionData?.gamesProcessed || 0} games successfully`);
+          
+          // Retry the query after fetching fresh data
+          const { data: retryData, error: retryError } = await supabase
+            .from('odds_cache')
+            .select('*')
+            .eq('sport', 'American Football')
+            .gt('game_date', new Date().toISOString())
+            .lt('game_date', new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString())
+            .order('game_date', { ascending: true });
+            
+          if (retryError) {
+            console.error('Error on retry:', retryError);
+            toast.error('Failed to load games after refresh');
+            return;
+          }
+          
+          const retryGamesData = retryData;
+          
+          if (!retryGamesData || retryGamesData.length === 0) {
+            console.log('⚠️ Still no games found after fetch-odds call');
+            toast.warning('No NFL games available for the next 14 days. Check back closer to game day.');
+            setGames([]);
+            return;
+          }
+          
+          console.log(`✅ Successfully loaded ${retryGamesData.length} games after refresh`);
+          setGames(retryGamesData.map(game => ({
+            ...game,
+            player_props: (game.player_props as unknown as PlayerPropsData) || {}
+          })));
+          return;
+          
+        } catch (fetchError) {
+          console.error('Error calling fetch-odds function:', fetchError);
+          toast.error(`Could not fetch fresh game data: ${fetchError.message || 'Network error'}`);
+          setGames([]);
+          return;
+        }
       } else {
         console.log(`Fetched ${gamesData?.length || 0} games from database`);
         
