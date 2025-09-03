@@ -183,6 +183,36 @@ const handler = async (req: Request): Promise<Response> => {
 
       console.log(`Fetched ${nflGames.length} NFL games and ${preseasonGames.length} preseason games`);
       console.log(`Fetched player props for ${nflPlayerProps.length + preseasonPlayerProps.length} games`);
+      
+      // Log detailed player props info for debugging
+      let propsCount = 0;
+      let gamesWithProps = 0;
+      nflPlayerProps.forEach(game => {
+        if (game.bookmakers && game.bookmakers.length > 0) {
+          gamesWithProps++;
+          game.bookmakers.forEach(bookmaker => {
+            if (bookmaker.markets) {
+              propsCount += bookmaker.markets.length;
+            }
+          });
+        }
+      });
+      preseasonPlayerProps.forEach(game => {
+        if (game.bookmakers && game.bookmakers.length > 0) {
+          gamesWithProps++;
+          game.bookmakers.forEach(bookmaker => {
+            if (bookmaker.markets) {
+              propsCount += bookmaker.markets.length;
+            }
+          });
+        }
+      });
+      
+      console.log(`Player props details: ${gamesWithProps} games have props, ${propsCount} total prop markets found`);
+      if (gamesWithProps === 0) {
+        console.log('WARNING: No player props found for any games. This is expected for games >48 hours away.');
+      }
+      
       apiSuccess = true;
 
       // Combine all games
@@ -193,7 +223,11 @@ const handler = async (req: Request): Promise<Response> => {
       const playerPropsMap = new Map();
       allPlayerProps.forEach(game => {
         if (game.bookmakers && game.bookmakers.length > 0) {
-          playerPropsMap.set(game.id, extractPlayerProps(game));
+          const props = extractPlayerProps(game);
+          playerPropsMap.set(game.id, props);
+          console.log(`Extracted props for ${game.home_team} vs ${game.away_team}: ${Object.keys(props).length} categories`);
+        } else {
+          console.log(`No props available for ${game.home_team || 'Unknown'} vs ${game.away_team || 'Unknown'} (ID: ${game.id})`);
         }
       });
 
@@ -210,8 +244,16 @@ const handler = async (req: Request): Promise<Response> => {
           
           // Get player props from map (O(1) lookup vs N API calls)
           const playerProps = playerPropsMap.get(game.id) || {};
-          if (Object.keys(playerProps).length > 0) {
-            console.log(`Added player props for ${game.home_team} vs ${game.away_team}`);
+          const propsAvailable = Object.keys(playerProps).length > 0;
+          
+          // Calculate hours until game starts for props availability context
+          const gameTime = new Date(game.commence_time);
+          const hoursUntilGame = (gameTime.getTime() - Date.now()) / (1000 * 60 * 60);
+          
+          if (propsAvailable) {
+            console.log(`✓ Props available for ${game.home_team} vs ${game.away_team} (${Math.round(hoursUntilGame)}h until kickoff)`);
+          } else {
+            console.log(`✗ No props for ${game.home_team} vs ${game.away_team} (${Math.round(hoursUntilGame)}h until kickoff) - ${hoursUntilGame > 48 ? 'likely too early' : 'check API'}`);
           }
 
           return {

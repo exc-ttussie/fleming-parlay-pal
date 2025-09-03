@@ -558,9 +558,45 @@ export const EnhancedCreateLegModal = ({
                     {/* Player Props List */}
                     <div className="grid gap-3 max-h-96 overflow-y-auto">
                       {getPlayerPropOptions(selectedGame).length === 0 ? (
-                        <div className="text-center py-8 text-muted-foreground">
-                          <p>No player props available for this game.</p>
-                          <p className="text-sm mt-2">Try selecting a different game or clearing filters.</p>
+                        <div className="text-center py-8 text-muted-foreground space-y-3">
+                          <div>
+                            <p className="font-medium">No player props available for this game</p>
+                            {(() => {
+                              const gameTime = new Date(selectedGame.game_date);
+                              const hoursUntilGame = (gameTime.getTime() - Date.now()) / (1000 * 60 * 60);
+                              const lastUpdated = new Date(selectedGame.updated_at);
+                              
+                              if (hoursUntilGame > 48) {
+                                return (
+                                  <div className="text-sm mt-2 space-y-1">
+                                    <p>Player props typically become available 24-48 hours before kickoff.</p>
+                                    <p className="text-xs">Game starts in {Math.round(hoursUntilGame)} hours</p>
+                                  </div>
+                                );
+                              } else if (hoursUntilGame > 0) {
+                                return (
+                                  <div className="text-sm mt-2 space-y-1">
+                                    <p>Props should be available soon. Try refreshing odds.</p>
+                                    <p className="text-xs">Game starts in {Math.round(hoursUntilGame)} hours</p>
+                                  </div>
+                                );
+                              } else {
+                                return (
+                                  <div className="text-sm mt-2">
+                                    <p>Game has already started - props are no longer available.</p>
+                                  </div>
+                                );
+                              }
+                            })()}
+                            <p className="text-xs text-muted-foreground/60 mt-2">
+                              Last updated: {new Date(selectedGame.updated_at).toLocaleTimeString()}
+                            </p>
+                          </div>
+                          {playerSearch || selectedCategory ? (
+                            <div className="pt-2 border-t border-border/50">
+                              <p className="text-xs">Try clearing filters or selecting a different game.</p>
+                            </div>
+                          ) : null}
                         </div>
                       ) : (
                         getPlayerPropOptions(selectedGame).map((bet, index) => (
