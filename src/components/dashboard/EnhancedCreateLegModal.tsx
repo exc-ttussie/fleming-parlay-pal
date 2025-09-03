@@ -102,58 +102,106 @@ export const EnhancedCreateLegModal = ({
   // Fetch available games
   const fetchGames = async () => {
     try {
+      console.log('Invoking fetch-odds to refresh data...');
       setFetchingOdds(true);
       
-      console.log('Fetching NFL odds...');
+      const { data, error } = await supabase.functions.invoke('fetch-odds', {
+        body: {}
+      });
       
-      // First, refresh odds from API
-      const { data: functionData, error: functionError } = await supabase.functions.invoke('fetch-odds');
-      
-      if (functionError) {
-        console.error('Function error:', functionError);
-        toast.error('Failed to refresh odds from API');
-      } else if (functionData) {
-        console.log('Function response:', functionData);
-        if (!functionData.success) {
-          toast.error(functionData.error || 'Failed to fetch odds');
-        } else if (!functionData.api_success) {
-          toast.info('Using backup game data - live odds temporarily unavailable');
-        } else if (functionData.rate_limit?.requests_remaining !== null) {
-          console.log(`API requests remaining: ${functionData.rate_limit.requests_remaining}`);
+      if (error) {
+        console.error('Error refreshing odds:', error);
+        toast.error('Failed to refresh odds. Using cached data.');
+      } else {
+        console.log('Odds refresh result:', data);
+        
+        if (data?.api_success === false) {
+          toast.info(data?.message || 'Using test data with sample player props including Tua Tagovailoa');
+        } else if (data?.success) {
+          toast.success(data?.message || 'Odds refreshed successfully');
         }
       }
       
-      // Then fetch NFL games from cache (including preseason)
-      // Only show games within the next 7 days to keep it relevant
-      const nextWeek = new Date();
-      nextWeek.setDate(nextWeek.getDate() + 7);
-      
-      const { data, error } = await supabase
+      // Now fetch the updated games
+      const { data: gamesData, error: gamesError } = await supabase
         .from('odds_cache')
         .select('*')
-        .in('league', ['AMERICANFOOTBALL NFL', 'AMERICANFOOTBALL NFL PRESEASON'])
-        .gte('game_date', new Date().toISOString())
-        .lte('game_date', nextWeek.toISOString())
-        .order('game_date', { ascending: true })
-        .limit(20);
-
-      if (error) {
-        console.error('Database error:', error);
-        throw error;
-      }
+        .eq('sport', 'American Football')
+        .gt('game_date', new Date().toISOString())
+        .lt('game_date', new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString())
+        .order('game_date', { ascending: true });
       
-      console.log(`Fetched ${data?.length || 0} NFL games from cache`);
-      setGames((data || []).map(game => ({
-        ...game,
-        player_props: (game.player_props as unknown as PlayerPropsData) || {}
-      })));
-      
-      if (!data || data.length === 0) {
-        toast.error('No NFL games available. Please try again later or contact support if the issue persists.');
+      if (gamesError) {
+        console.error('Error fetching games:', gamesError);
+        toast.error('Failed to fetch updated games');
+      } else {
+        console.log(`Fetched ${gamesData?.length || 0} games from database`);
+        
+        // Enhanced debugging for player props
+        let gamesWithProps = 0;
+        let totalPropCategories = 0;
+        let dolphinsGame = null;
+        let tuaPropsFound = false;
+        
+        gamesData?.forEach(game => {
+          const propCategories = Object.keys(game.player_props || {}).length;
+          if (propCategories > 0) {
+            gamesWithProps++;
+            totalPropCategories += propCategories;
+            console.log(`✓ ${game.team_a} vs ${game.team_b}: ${propCategories} prop categories available`);
+            
+            // Check for Tua's props specifically
+            const passingProps = game.player_props?.['Passing']?.['player_pass_yds'];
+            if (passingProps?.['Tua Tagovailoa']) {
+              tuaPropsFound = true;
+              console.log(`🎯 Found Tua Tagovailoa passing yards prop: Over/Under ${passingProps['Tua Tagovailoa'].point} at ${passingProps['Tua Tagovailoa'].price}`);
+            }
+          } else {
+            const gameTime = new Date(game.game_date);
+            const hoursUntilGame = (gameTime.getTime() - Date.now()) / (1000 * 60 * 60);
+            console.log(`✗ ${game.team_a} vs ${game.team_b}: No props (${Math.round(hoursUntilGame)}h until kickoff)`);
+          }
+          
+          // Check for Dolphins games specifically
+          if (game.team_a?.includes('Dolphins') || game.team_b?.includes('Dolphins')) {
+            dolphinsGame = game;
+            console.log(`🐬 Found Dolphins game: ${game.team_a} vs ${game.team_b}`);
+            console.log(`🐬 Props available: ${Object.keys(game.player_props || {}).length} categories`);
+            if (game.player_props && Object.keys(game.player_props).length > 0) {
+              console.log(`🐬 Player props preview:`, Object.keys(game.player_props));
+            }
+          }
+        });
+        
+        console.log(`\n📊 DATABASE PROPS SUMMARY:`);
+        console.log(`Total games: ${gamesData?.length || 0}`);
+        console.log(`Games with props: ${gamesWithProps}`);
+        console.log(`Total prop categories: ${totalPropCategories}`);
+        console.log(`Dolphins game found: ${!!dolphinsGame}`);
+        console.log(`Tua props found: ${tuaPropsFound}`);
+        
+        if (tuaPropsFound) {
+          console.log('🎯 SUCCESS: Tua Tagovailoa passing yards prop is available for testing!');
+          toast.success('Found Tua\'s passing yards prop - ready for testing!');
+        } else if (dolphinsGame) {
+          console.log('⚠️ Dolphins game exists but no Tua props found');
+        }
+        
+        setGames((gamesData || []).map(game => ({
+          ...game,
+          player_props: (game.player_props as unknown as PlayerPropsData) || {}
+        })));
+        
+        // Show additional info in toast for user awareness
+        if (data?.api_success === false && gamesWithProps > 0) {
+          toast.info(`Using ${gamesData?.length || 0} test games with comprehensive player props for demo/testing`);
+        } else if (gamesWithProps === 0) {
+          toast.error('No games with player props available. This may be because games are too far in the future.');
+        }
       }
-    } catch (error) {
-      console.error('Error fetching games:', error);
-      toast.error('Failed to fetch NFL games. Please check your connection and try again.');
+    } catch (err) {
+      console.error('Error in fetchGames:', err);
+      toast.error('Failed to fetch games');
     } finally {
       setFetchingOdds(false);
     }

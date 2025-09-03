@@ -117,6 +117,69 @@ const fallbackGames = [
       }
     },
     updated_at: new Date().toISOString(),
+  },
+  {
+    external_game_id: 'test-dolphins-game',
+    sport: 'American Football',
+    league: 'AMERICANFOOTBALL NFL',
+    game_date: new Date(Date.now() + 36 * 60 * 60 * 1000).toISOString(), // 36 hours from now
+    team_a: 'Miami Dolphins',
+    team_b: 'New York Jets',
+    moneyline_home: -125,
+    moneyline_away: 105,
+    spread_home: -2.5,
+    spread_home_odds: -110,
+    spread_away: 2.5,
+    spread_away_odds: -110,
+    total_over: 44.5,
+    total_over_odds: -110,
+    total_under: 44.5,
+    total_under_odds: -110,
+    player_props: {
+      'Passing': {
+        'player_pass_yds': {
+          'Tua Tagovailoa': { player_name: 'Tua Tagovailoa', market_key: 'player_pass_yds', category: 'Passing', point: 247.5, price: -115, bookmaker: 'draftkings' },
+          'Aaron Rodgers': { player_name: 'Aaron Rodgers', market_key: 'player_pass_yds', category: 'Passing', point: 265.5, price: -110, bookmaker: 'draftkings' }
+        },
+        'player_pass_tds': {
+          'Tua Tagovailoa': { player_name: 'Tua Tagovailoa', market_key: 'player_pass_tds', category: 'Passing', point: 1.5, price: -120, bookmaker: 'draftkings' },
+          'Aaron Rodgers': { player_name: 'Aaron Rodgers', market_key: 'player_pass_tds', category: 'Passing', point: 1.5, price: -105, bookmaker: 'draftkings' }
+        },
+        'player_pass_completions': {
+          'Tua Tagovailoa': { player_name: 'Tua Tagovailoa', market_key: 'player_pass_completions', category: 'Passing', point: 22.5, price: -110, bookmaker: 'draftkings' },
+          'Aaron Rodgers': { player_name: 'Aaron Rodgers', market_key: 'player_pass_completions', category: 'Passing', point: 20.5, price: -115, bookmaker: 'draftkings' }
+        }
+      },
+      'Rushing': {
+        'player_rush_yds': {
+          'De\'Von Achane': { player_name: 'De\'Von Achane', market_key: 'player_rush_yds', category: 'Rushing', point: 78.5, price: -110, bookmaker: 'draftkings' },
+          'Breece Hall': { player_name: 'Breece Hall', market_key: 'player_rush_yds', category: 'Rushing', point: 65.5, price: -115, bookmaker: 'draftkings' }
+        },
+        'player_rush_tds': {
+          'De\'Von Achane': { player_name: 'De\'Von Achane', market_key: 'player_rush_tds', category: 'Rushing', point: 0.5, price: 115, bookmaker: 'draftkings' },
+          'Breece Hall': { player_name: 'Breece Hall', market_key: 'player_rush_tds', category: 'Rushing', point: 0.5, price: 105, bookmaker: 'draftkings' }
+        }
+      },
+      'Receiving': {
+        'player_reception_yds': {
+          'Tyreek Hill': { player_name: 'Tyreek Hill', market_key: 'player_reception_yds', category: 'Receiving', point: 85.5, price: -115, bookmaker: 'draftkings' },
+          'Jaylen Waddle': { player_name: 'Jaylen Waddle', market_key: 'player_reception_yds', category: 'Receiving', point: 62.5, price: -110, bookmaker: 'draftkings' },
+          'Garrett Wilson': { player_name: 'Garrett Wilson', market_key: 'player_reception_yds', category: 'Receiving', point: 68.5, price: -105, bookmaker: 'draftkings' }
+        },
+        'player_receptions': {
+          'Tyreek Hill': { player_name: 'Tyreek Hill', market_key: 'player_receptions', category: 'Receiving', point: 6.5, price: -120, bookmaker: 'draftkings' },
+          'Jaylen Waddle': { player_name: 'Jaylen Waddle', market_key: 'player_receptions', category: 'Receiving', point: 5.5, price: -110, bookmaker: 'draftkings' }
+        }
+      },
+      'Touchdowns': {
+        'player_anytime_td': {
+          'Tyreek Hill': { player_name: 'Tyreek Hill', market_key: 'player_anytime_td', category: 'Touchdowns', point: null, price: 140, bookmaker: 'draftkings' },
+          'De\'Von Achane': { player_name: 'De\'Von Achane', market_key: 'player_anytime_td', category: 'Touchdowns', point: null, price: 130, bookmaker: 'draftkings' },
+          'Garrett Wilson': { player_name: 'Garrett Wilson', market_key: 'player_anytime_td', category: 'Touchdowns', point: null, price: 155, bookmaker: 'draftkings' }
+        }
+      }
+    },
+    updated_at: new Date().toISOString(),
   }
 ];
 
@@ -184,33 +247,88 @@ const handler = async (req: Request): Promise<Response> => {
       console.log(`Fetched ${nflGames.length} NFL games and ${preseasonGames.length} preseason games`);
       console.log(`Fetched player props for ${nflPlayerProps.length + preseasonPlayerProps.length} games`);
       
-      // Log detailed player props info for debugging
+      // ENHANCED DEBUGGING: Log detailed API response analysis
       let propsCount = 0;
       let gamesWithProps = 0;
-      nflPlayerProps.forEach(game => {
-        if (game.bookmakers && game.bookmakers.length > 0) {
-          gamesWithProps++;
-          game.bookmakers.forEach(bookmaker => {
-            if (bookmaker.markets) {
-              propsCount += bookmaker.markets.length;
-            }
-          });
-        }
-      });
-      preseasonPlayerProps.forEach(game => {
-        if (game.bookmakers && game.bookmakers.length > 0) {
-          gamesWithProps++;
-          game.bookmakers.forEach(bookmaker => {
-            if (bookmaker.markets) {
-              propsCount += bookmaker.markets.length;
-            }
-          });
-        }
-      });
+      let gamesWithin48Hours = 0;
+      let gamesWithPropsWithin48Hours = 0;
       
-      console.log(`Player props details: ${gamesWithProps} games have props, ${propsCount} total prop markets found`);
+      // Debug function to analyze each game's prop availability
+      const analyzeGameProps = (games: any[], gameType: string) => {
+        games.forEach((game, index) => {
+          const gameTime = new Date(game.commence_time);
+          const hoursUntilGame = (gameTime.getTime() - Date.now()) / (1000 * 60 * 60);
+          const isWithin48Hours = hoursUntilGame <= 48;
+          
+          if (isWithin48Hours) gamesWithin48Hours++;
+          
+          console.log(`\n=== ${gameType.toUpperCase()} GAME ${index + 1}: ${game.home_team} vs ${game.away_team} ===`);
+          console.log(`Game ID: ${game.id}`);
+          console.log(`Kickoff: ${game.commence_time} (${Math.round(hoursUntilGame)}h from now)`);
+          console.log(`Within 48h: ${isWithin48Hours ? 'YES' : 'NO'}`);
+          
+          if (game.bookmakers && game.bookmakers.length > 0) {
+            console.log(`Bookmakers available: ${game.bookmakers.length}`);
+            
+            game.bookmakers.forEach((bookmaker: any, bmIndex: number) => {
+              console.log(`  Bookmaker ${bmIndex + 1}: ${bookmaker.title} (${bookmaker.key})`);
+              
+              if (bookmaker.markets && bookmaker.markets.length > 0) {
+                console.log(`    Markets: ${bookmaker.markets.length}`);
+                bookmaker.markets.forEach((market: any, mIndex: number) => {
+                  console.log(`      Market ${mIndex + 1}: ${market.key} (${market.outcomes?.length || 0} outcomes)`);
+                  
+                  // Log sample outcomes for player prop markets
+                  if (market.key.includes('player_') && market.outcomes) {
+                    market.outcomes.slice(0, 2).forEach((outcome: any) => {
+                      console.log(`        Sample: ${outcome.name} - ${outcome.point || 'N/A'} @ ${outcome.price}`);
+                    });
+                  }
+                  propsCount++;
+                });
+                
+                gamesWithProps++;
+                if (isWithin48Hours) gamesWithPropsWithin48Hours++;
+              } else {
+                console.log(`    NO MARKETS for ${bookmaker.title}`);
+              }
+            });
+          } else {
+            console.log(`NO BOOKMAKERS for this game`);
+          }
+          
+          // Special attention to Dolphins games
+          if (game.home_team?.includes('Dolphins') || game.away_team?.includes('Dolphins')) {
+            console.log(`🐬 DOLPHINS GAME DETECTED! ${game.home_team} vs ${game.away_team}`);
+            console.log(`🐬 Hours until kickoff: ${Math.round(hoursUntilGame)}`);
+            console.log(`🐬 Bookmakers: ${game.bookmakers?.length || 0}`);
+            console.log(`🐬 Total markets: ${game.bookmakers?.reduce((sum: number, bm: any) => sum + (bm.markets?.length || 0), 0) || 0}`);
+          }
+        });
+      };
+      
+      console.log('\n📊 ANALYZING NFL PLAYER PROPS API RESPONSE:');
+      analyzeGameProps(nflPlayerProps, 'nfl');
+      
+      console.log('\n📊 ANALYZING NFL PRESEASON PLAYER PROPS API RESPONSE:');
+      analyzeGameProps(preseasonPlayerProps, 'preseason');
+      
+      console.log(`\n🔢 SUMMARY STATS:`);
+      console.log(`Total games analyzed: ${nflPlayerProps.length + preseasonPlayerProps.length}`);
+      console.log(`Games within 48h: ${gamesWithin48Hours}`);
+      console.log(`Games with any props: ${gamesWithProps}`);
+      console.log(`Games with props within 48h: ${gamesWithPropsWithin48Hours}`);
+      console.log(`Total prop markets found: ${propsCount}`);
+      
       if (gamesWithProps === 0) {
-        console.log('WARNING: No player props found for any games. This is expected for games >48 hours away.');
+        console.log('\n❌ CRITICAL: No player props found for ANY games!');
+        console.log('This suggests an issue with:');
+        console.log('1. API endpoint URLs');
+        console.log('2. Market key parameters');
+        console.log('3. Bookmaker availability'); 
+        console.log('4. API response format changes');
+      } else if (gamesWithPropsWithin48Hours === 0 && gamesWithin48Hours > 0) {
+        console.log('\n⚠️  WARNING: Games within 48h exist but have no props - this is unusual');
       }
       
       apiSuccess = true;
