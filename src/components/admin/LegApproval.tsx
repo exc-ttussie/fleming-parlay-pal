@@ -9,7 +9,7 @@ import { toast } from 'sonner';
 import { Check, X, AlertCircle } from 'lucide-react';
 
 interface LegWithProfile extends Leg {
-  profiles?: { name: string } | null;
+  profiles?: { name: string; user_id: string } | null;
 }
 
 export const LegApproval = () => {
@@ -19,20 +19,42 @@ export const LegApproval = () => {
 
   const fetchPendingLegs = async () => {
     try {
-      const { data, error } = await supabase
+      // First get pending legs
+      const { data: legsData, error: legsError } = await supabase
         .from('legs')
-        .select(`
-          *,
-          profiles:user_id (name)
-        `)
+        .select('*')
         .in('status', ['PENDING', 'CONFLICT'])
         .order('created_at', { ascending: true });
 
-      if (error) throw error;
-      setLegs((data as unknown) as LegWithProfile[] || []);
+      if (legsError) throw legsError;
+
+      // Then get profiles for each leg
+      const userIds = legsData?.map(leg => leg.user_id).filter(Boolean) || [];
+      
+      let profilesData: any[] = [];
+      if (userIds.length > 0) {
+        const { data: profiles, error: profilesError } = await supabase
+          .from('profiles')
+          .select('user_id, name')
+          .in('user_id', userIds);
+
+        if (profilesError) {
+          console.error('Error fetching profiles:', profilesError);
+        } else {
+          profilesData = profiles || [];
+        }
+      }
+
+      // Combine legs with profile data
+      const legsWithProfiles = legsData?.map(leg => ({
+        ...leg,
+        profiles: profilesData.find(profile => profile.user_id === leg.user_id) || null
+      })) || [];
+
+      setLegs(legsWithProfiles);
     } catch (error) {
       console.error('Error fetching pending legs:', error);
-      toast.error('Failed to fetch legs for approval');
+      toast.error('Unable to fetch legs for approval. Please check your connection and try again.');
     } finally {
       setLoading(false);
     }

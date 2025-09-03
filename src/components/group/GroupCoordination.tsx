@@ -10,7 +10,7 @@ import { formatCurrency, parlayDecimal, parlayPayout } from '@/lib/parlay';
 import { getNextSundayLockTime } from '@/lib/dateUtils';
 
 interface LegWithProfile extends Leg {
-  safe_profiles?: { name: string; team_name?: string } | null;
+  safe_profiles?: { name: string; team_name?: string; user_id: string } | null;
 }
 
 export const GroupCoordination = () => {
@@ -39,20 +39,42 @@ export const GroupCoordination = () => {
 
   const fetchLegs = async (weekId: string) => {
     try {
-      const { data, error } = await supabase
+      // First get legs
+      const { data: legsData, error: legsError } = await supabase
         .from('legs')
-        .select(`
-          *,
-          safe_profiles:user_id (name, team_name)
-        `)
+        .select('*')
         .eq('week_id', weekId)
         .order('created_at', { ascending: true });
 
-      if (error) throw error;
-      setLegs((data as unknown) as LegWithProfile[] || []);
+      if (legsError) throw legsError;
+
+      // Then get profiles for each leg
+      const userIds = legsData?.map(leg => leg.user_id).filter(Boolean) || [];
+      
+      let profilesData: any[] = [];
+      if (userIds.length > 0) {
+        const { data: profiles, error: profilesError } = await supabase
+          .from('profiles')
+          .select('user_id, name, team_name')
+          .in('user_id', userIds);
+
+        if (profilesError) {
+          console.error('Error fetching profiles:', profilesError);
+        } else {
+          profilesData = profiles || [];
+        }
+      }
+
+      // Combine legs with profile data
+      const legsWithProfiles = legsData?.map(leg => ({
+        ...leg,
+        safe_profiles: profilesData.find(profile => profile.user_id === leg.user_id) || null
+      })) || [];
+
+      setLegs(legsWithProfiles);
     } catch (error) {
       console.error('Error fetching legs:', error);
-      toast.error('Failed to fetch legs');
+      toast.error('Unable to fetch legs. Please check your connection and try again.');
     }
   };
 
