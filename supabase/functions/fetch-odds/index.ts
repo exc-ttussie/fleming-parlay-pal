@@ -427,15 +427,37 @@ const handler = async (req: Request): Promise<Response> => {
         );
       }
       
-      // Only use fallback for network/service errors, not authentication
-      allGames = [...fallbackGames];
-      console.log('Using fallback data due to API service error (not authentication)');
+      // No fallback to test games - user needs working API to get real data
+      console.log('API service error occurred - no fallback to test games');
+      return new Response(
+        JSON.stringify({ 
+          success: false, 
+          error: 'API Service Error', 
+          message: 'Failed to fetch real game data. Please check API service status.',
+          games_processed: 0 
+        }),
+        {
+          status: 500,
+          headers: { 'Content-Type': 'application/json', ...corsHeaders },
+        }
+      );
     }
     
-    // If no games were fetched from API, use fallback data (only for non-auth errors)
+    // If no games were fetched from API, return error instead of fallback
     if (!apiSuccess && allGames.length === 0) {
-      console.log('No games from API, using fallback data');
-      allGames = [...fallbackGames];
+      console.log('No games available from API - no fallback to test games');
+      return new Response(
+        JSON.stringify({ 
+          success: false, 
+          error: 'No Games Available', 
+          message: 'No real game data available from API.',
+          games_processed: 0 
+        }),
+        {
+          status: 404,
+          headers: { 'Content-Type': 'application/json', ...corsHeaders },
+        }
+      );
     }
     
     console.log(`Total games processed: ${allGames.length}`);
