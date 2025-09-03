@@ -96,7 +96,7 @@ export const EnhancedCreateLegModal = ({
   const [selectedGame, setSelectedGame] = useState<Game | null>(null);
   const [selectedBet, setSelectedBet] = useState<BetOption | null>(null);
   const [activeTab, setActiveTab] = useState<'game' | 'props'>('game');
-  const [selectedCategory, setSelectedCategory] = useState<string>('');
+  const [selectedCategory, setSelectedCategory] = useState<string>('all');
   const [playerSearch, setPlayerSearch] = useState<string>('');
 
   // Fetch available games
@@ -286,9 +286,9 @@ export const EnhancedCreateLegModal = ({
     
     if (!game.player_props) return options;
 
-    Object.entries(game.player_props).forEach(([category, markets]) => {
-      // Filter by selected category if one is selected
-      if (selectedCategory && category !== selectedCategory) return;
+      Object.entries(game.player_props).forEach(([category, markets]) => {
+        // Filter by selected category if one is selected
+        if (selectedCategory && selectedCategory !== 'all' && category !== selectedCategory) return;
 
       Object.entries(markets).forEach(([marketKey, players]) => {
         Object.entries(players).forEach(([playerName, prop]) => {
@@ -421,7 +421,7 @@ export const EnhancedCreateLegModal = ({
       setSelectedGame(null);
       setSelectedBet(null);
       setActiveTab('game');
-      setSelectedCategory('');
+      setSelectedCategory('all');
       setPlayerSearch('');
       
     } catch (error: any) {
@@ -482,7 +482,7 @@ export const EnhancedCreateLegModal = ({
                         setSelectedGame(game);
                         setSelectedBet(null);
                         setActiveTab('game');
-                        setSelectedCategory('');
+                        setSelectedCategory('all');
                         setPlayerSearch('');
                       }}
                     >
@@ -592,7 +592,7 @@ export const EnhancedCreateLegModal = ({
                             <SelectValue placeholder="All Categories" />
                           </SelectTrigger>
                           <SelectContent>
-                            <SelectItem value="">All Categories</SelectItem>
+                            <SelectItem value="all">All Categories</SelectItem>
                             {getAvailableCategories(selectedGame).map((category) => (
                               <SelectItem key={category} value={category}>
                                 {category}
