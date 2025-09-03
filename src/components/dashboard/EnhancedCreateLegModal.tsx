@@ -117,18 +117,20 @@ export const EnhancedCreateLegModal = ({
         console.log('Odds refresh result:', data);
         
         if (data?.success === false) {
-          // Handle different error types with clear user messages
+          // Handle different error types with appropriate messages
           if (data?.error === 'API Authentication Failed') {
-            toast.error('Live odds unavailable: API key invalid or not configured');
+            toast.error('Live odds unavailable: API key invalid. Using cached data.');
           } else if (data?.error === 'API Quota Exceeded') {
-            toast.error('Live odds unavailable: API quota exceeded');
+            toast.error('Live odds unavailable: API quota exceeded. Using cached data.');
           } else if (data?.error === 'No Upcoming Games') {
-            toast.info('No upcoming NFL games found in the next 14 days');
+            toast.info('No upcoming NFL games found in next 14 days.');
           } else {
-            toast.error(`Live odds unavailable: ${data?.message || 'Unknown error'}`);
+            toast.error(`Live odds unavailable: ${data?.message || 'Unknown error'}. Using cached data.`);
           }
+        } else if (data?.api_success === false) {
+          toast.info('Live odds unavailable: Using test data with comprehensive player props');
         } else if (data?.success) {
-          toast.success(data?.message || 'Odds refreshed successfully');
+          toast.success(data?.message || 'Live odds updated successfully');
         }
       }
       
@@ -453,6 +455,9 @@ export const EnhancedCreateLegModal = ({
             <TrendingUp className="h-5 w-5 text-primary" />
             <span className="text-primary font-bold">LET THE DEED SHAW</span> - NFL Betting
           </DialogTitle>
+          <DialogDescription className="sr-only">
+            Select an NFL game and place your bet to add a leg to the group parlay
+          </DialogDescription>
           <DialogDescription className="sr-only">
             Select an NFL game and bet type to submit your leg for this week's parlay
           </DialogDescription>

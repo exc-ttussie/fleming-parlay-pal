@@ -241,7 +241,7 @@ export const Dashboard = () => {
                 📊 Real-time NFL odds powered by The Odds API
               </p>
               <p className="text-xs">
-                Current season: 2025 NFL Season • 
+                Current season: 2024-25 NFL Season • 
                 Updated continuously for next 14 days of games
               </p>
             </div>

@@ -34,7 +34,7 @@ interface OddsResponse {
   }>;
 }
 
-// Fallback NFL preseason games for testing when API is unavailable
+// Fallback games array
 const fallbackGames = [
   {
     external_game_id: 'test-game-1',
@@ -70,6 +70,7 @@ const fallbackGames = [
           'Isiah Pacheco': { player_name: 'Isiah Pacheco', market_key: 'player_rush_yds', category: 'Rushing', point: 67.5, price: -115, bookmaker: 'draftkings' }
         }
       },
+      // Comprehensive player props
       'Receiving': {
         'player_reception_yds': {
           'Travis Kelce': { player_name: 'Travis Kelce', market_key: 'player_reception_yds', category: 'Receiving', point: 67.5, price: -120, bookmaker: 'draftkings' },
@@ -89,7 +90,7 @@ const fallbackGames = [
     external_game_id: 'test-game-2',
     sport: 'American Football',
     league: 'AMERICANFOOTBALL NFL PRESEASON',
-    game_date: new Date(Date.now() + 2 * 24 * 60 * 60 * 1000).toISOString(), // Day after tomorrow
+    game_date: new Date(Date.now() + 2 * 24 * 60 * 60 * 1000).toISOString(),
     team_a: 'Dallas Cowboys',
     team_b: 'Philadelphia Eagles',
     moneyline_home: 105,
@@ -122,7 +123,7 @@ const fallbackGames = [
     external_game_id: 'test-dolphins-game',
     sport: 'American Football',
     league: 'AMERICANFOOTBALL NFL',
-    game_date: new Date(Date.now() + 36 * 60 * 60 * 1000).toISOString(), // 36 hours from now
+    game_date: new Date(Date.now() + 36 * 60 * 60 * 1000).toISOString(),
     team_a: 'Miami Dolphins',
     team_b: 'New York Jets',
     moneyline_home: -125,
@@ -206,7 +207,7 @@ const handler = async (req: Request): Promise<Response> => {
           games_processed: 0 
         }),
         {
-          status: 500,
+          status: 200,
           headers: { 'Content-Type': 'application/json', ...corsHeaders },
         }
       );
@@ -254,78 +255,88 @@ const handler = async (req: Request): Promise<Response> => {
       if (remainingRequests) apiRateLimit.requests_remaining = parseInt(remainingRequests);
       if (usedRequests) apiRateLimit.requests_used = parseInt(usedRequests);
 
-      // Check responses with detailed error handling
+      // Check responses with enhanced error handling
       if (!nflResponse.ok) {
-        let errorText = '';
-        let errorObj: any = {};
-        
-        try {
-          errorText = await nflResponse.text();
-          errorObj = JSON.parse(errorText || '{}');
-        } catch (parseError) {
-          console.error('Could not parse API error response:', parseError);
-        }
-        
+        const errorText = await nflResponse.text();
         console.error(`NFL API Error ${nflResponse.status}:`, errorText);
         
-        // Enhanced error messages for common issues with consistent JSON responses
+        // Enhanced error messages for common issues with proper JSON responses
         if (nflResponse.status === 401) {
-          if (errorObj?.error_code === 'MISSING_KEY') {
-            return new Response(
-              JSON.stringify({ 
-                success: false, 
-                error: 'API Authentication Failed',
-                message: 'Invalid or missing ODDS_API_KEY. Please check your API key configuration.',
-                games_processed: 0 
-              }),
-              { status: 200, headers: { 'Content-Type': 'application/json', ...corsHeaders } }
-            );
-          } else if (errorObj?.error_code === 'QUOTA_EXCEEDED') {
-            return new Response(
-              JSON.stringify({ 
-                success: false, 
-                error: 'API Quota Exceeded',
-                message: 'You have reached your API request limit. Please upgrade your plan or wait for quota reset.',
-                games_processed: 0 
-              }),
-              { status: 200, headers: { 'Content-Type': 'application/json', ...corsHeaders } }
-            );
-          } else {
-            return new Response(
-              JSON.stringify({ 
-                success: false, 
-                error: 'API Authentication Failed',
-                message: `API key authentication failed: ${errorText}`,
-                games_processed: 0 
-              }),
-              { status: 200, headers: { 'Content-Type': 'application/json', ...corsHeaders } }
-            );
+          try {
+            const errorObj = JSON.parse(errorText || '{}');
+            if (errorObj?.error_code === 'MISSING_KEY') {
+              return new Response(
+                JSON.stringify({ 
+                  success: false, 
+                  error: 'API Authentication Failed', 
+                  message: 'Invalid or missing ODDS_API_KEY. Please check your API key configuration.',
+                  games_processed: 0 
+                }),
+                {
+                  status: 200,
+                  headers: { 'Content-Type': 'application/json', ...corsHeaders },
+                }
+              );
+            } else if (errorObj?.error_code === 'QUOTA_EXCEEDED') {
+              return new Response(
+                JSON.stringify({ 
+                  success: false, 
+                  error: 'API Quota Exceeded', 
+                  message: 'You have reached your API request limit. Please upgrade your plan or wait for quota reset.',
+                  games_processed: 0 
+                }),
+                {
+                  status: 200,
+                  headers: { 'Content-Type': 'application/json', ...corsHeaders },
+                }
+              );
+            }
+          } catch (parseError) {
+            console.error('Failed to parse error response:', parseError);
           }
-        } else if (nflResponse.status === 404) {
+          
           return new Response(
             JSON.stringify({ 
               success: false, 
-              error: 'No Upcoming Games',
+              error: 'API Authentication Failed', 
+              message: 'Authentication failed. Please verify your ODDS_API_KEY.',
+              games_processed: 0 
+            }),
+            {
+              status: 200,
+              headers: { 'Content-Type': 'application/json', ...corsHeaders },
+            }
+          );
+        }
+        
+        if (nflResponse.status === 404) {
+          return new Response(
+            JSON.stringify({ 
+              success: false, 
+              error: 'No Upcoming Games', 
               message: 'No NFL games found in the next 14 days.',
               games_processed: 0 
             }),
-            { status: 200, headers: { 'Content-Type': 'application/json', ...corsHeaders } }
-          );
-        } else {
-          return new Response(
-            JSON.stringify({ 
-              success: false, 
-              error: 'API Service Error',
-              message: `NFL API service error (${nflResponse.status}): ${errorText}`,
-              games_processed: 0 
-            }),
-            { status: 200, headers: { 'Content-Type': 'application/json', ...corsHeaders } }
+            {
+              status: 200,
+              headers: { 'Content-Type': 'application/json', ...corsHeaders },
+            }
           );
         }
+        
+        return new Response(
+          JSON.stringify({ 
+            success: false, 
+            error: 'API Service Error', 
+            message: `NFL API request failed: ${nflResponse.status} - ${errorText}`,
+            games_processed: 0 
+          }),
+          {
+            status: 200,
+            headers: { 'Content-Type': 'application/json', ...corsHeaders },
+          }
+        );
       }
-
-      // Set API success flag here after successful response
-      apiSuccess = true;
 
       const [nflGames, nflPlayerProps] = await Promise.all([
         nflResponse.json(),
@@ -335,389 +346,316 @@ const handler = async (req: Request): Promise<Response> => {
       console.log(`Fetched ${nflGames.length} NFL games in next 14 days`);
       console.log(`Fetched player props for ${nflPlayerProps.length} games`);
       
-      // ENHANCED DEBUGGING: Log detailed API response analysis for current NFL games
-      let propsCount = 0;
-      let gamesWithProps = 0;
+      // Process games and extract best odds
+      // const allGames = nflGames.map(game => {
+      //   const bestOdds = extractBestOdds(game);
+      //   return {
+      //     external_game_id: game.id,
+      //     sport: 'American Football',
+      //     league: 'AMERICANFOOTBALL NFL',
+      //     game_date: game.commence_time,
+      //     team_a: game.home_team,
+      //     team_b: game.away_team,
+      //     ...bestOdds,
+      //     updated_at: new Date().toISOString(),
+      //   };
+      // });
       
-      // Debug function to analyze each game's prop availability
-      const analyzeGameProps = (games: any[], gameType: string) => {
-        games.forEach((game, index) => {
-          const gameTime = new Date(game.commence_time);
-          const hoursUntilGame = (gameTime.getTime() - Date.now()) / (1000 * 60 * 60);
-          
-          console.log(`\n=== ${gameType.toUpperCase()} GAME ${index + 1}: ${game.home_team} vs ${game.away_team} ===`);
-          console.log(`Game ID: ${game.id}`);
-          console.log(`Kickoff: ${game.commence_time} (${Math.round(hoursUntilGame)}h from now)`);
-          
-          if (game.bookmakers && game.bookmakers.length > 0) {
-            console.log(`Bookmakers available: ${game.bookmakers.length}`);
+      // Function to process each game and extract player props
+      // const processGame = async (game: any) => {
+      //   const bestOdds = extractBestOdds(game);
+      //   let playerProps = {};
+        
+      //   // Fetch player props only if the game has bookmakers
+      //   if (game.bookmakers && game.bookmakers.length > 0) {
+      //     try {
+      //       // Fetch player props for the specific game
+      //       const playerPropsResponse = await fetch(
+      //         `https://api.the-odds-api.com/v4/sports/${game.sport_key}/odds/?apiKey=${oddsApiKey}&regions=us&markets=player_pass_yds,player_pass_tds,player_rush_yds,player_rush_tds,player_reception_yds,player_receptions,player_anytime_td&oddsFormat=american&bookmakers=draftkings,fanduel,betmgm,caesars`,
+      //         {
+      //           headers: {
+      //             'Content-Type': 'application/json',
+      //           },
+      //         }
+      //       );
             
-            game.bookmakers.forEach((bookmaker: any, bmIndex: number) => {
-              console.log(`  Bookmaker ${bmIndex + 1}: ${bookmaker.title} (${bookmaker.key})`);
-              
-              if (bookmaker.markets && bookmaker.markets.length > 0) {
-                console.log(`    Markets: ${bookmaker.markets.length}`);
-                bookmaker.markets.forEach((market: any, mIndex: number) => {
-                  console.log(`      Market ${mIndex + 1}: ${market.key} (${market.outcomes?.length || 0} outcomes)`);
-                  
-                  // Log sample outcomes for player prop markets
-                  if (market.key.includes('player_') && market.outcomes) {
-                    market.outcomes.slice(0, 2).forEach((outcome: any) => {
-                      console.log(`        Sample: ${outcome.name} - ${outcome.point || 'N/A'} @ ${outcome.price}`);
-                    });
-                  }
-                  propsCount++;
-                });
-                
-                gamesWithProps++;
-              } else {
-                console.log(`    NO MARKETS for ${bookmaker.title}`);
-              }
-            });
-          } else {
-            console.log(`NO BOOKMAKERS for this game`);
-          }
-        });
-      };
-      
-      console.log('\n📊 ANALYZING NFL PLAYER PROPS API RESPONSE:');
-      analyzeGameProps(nflPlayerProps, 'nfl');
-      
-      console.log(`\n🔢 SUMMARY STATS:`);
-      console.log(`Total games analyzed: ${nflPlayerProps.length}`);
-      console.log(`Games with any props: ${gamesWithProps}`);
-      console.log(`Total prop markets found: ${propsCount}`);
-      
-      if (gamesWithProps === 0 && nflGames.length > 0) {
-        console.log('\n❌ CRITICAL: Games found but no player props available!');
-        console.log('This suggests:');
-        console.log('1. Games might be too far in advance for props');
-        console.log('2. Props might not be available yet for playoff games');
-        console.log('3. API response format might have changed');
-      }
-      
-      // Combine all games
-      const allBasicGames = [...nflGames];
-      const allPlayerProps = [...nflPlayerProps];
+      //       if (!playerPropsResponse.ok) {
+      //         console.error(`Player Props API Error ${playerPropsResponse.status}:`, await playerPropsResponse.text());
+      //       } else {
+      //         const playerPropsData = await playerPropsResponse.json();
+      //         playerProps = extractPlayerProps(playerPropsData[0]); // Assuming only one game is returned
+      //       }
+      //     } catch (playerPropsError) {
+      //       console.error('Error fetching player props:', playerPropsError);
+      //     }
+      //   } else {
+      //     console.log(`No bookmakers available for game ${game.id}, skipping player props`);
+      //   }
+        
+      //   // Create proper league name format
+      //   let leagueName = 'AMERICANFOOTBALL NFL';
+        
+      //   return {
+      //     external_game_id: game.id,
+      //     sport: 'American Football',
+      //     league: leagueName,
+      //     game_date: game.commence_time,
+      //     team_a: game.home_team,
+      //     team_b: game.away_team,
+      //     ...bestOdds,
+      //     player_props: playerProps,
+      //     updated_at: new Date().toISOString(),
+      //   };
+      // };
 
       // Create a map of game ID to player props for fast O(1) lookup
       const playerPropsMap = new Map();
-      allPlayerProps.forEach(game => {
+      nflPlayerProps.forEach(game => {
         if (game.bookmakers && game.bookmakers.length > 0) {
           const props = extractPlayerProps(game);
           playerPropsMap.set(game.id, props);
-          console.log(`Extracted props for ${game.home_team} vs ${game.away_team}: ${Object.keys(props).length} categories`);
-        } else {
-          console.log(`No props available for ${game.home_team || 'Unknown'} vs ${game.away_team || 'Unknown'} (ID: ${game.id})`);
         }
       });
 
-      // Process all games concurrently - another big performance gain
+      // Process all games concurrently
       allGames = await Promise.all(
-        allBasicGames.map(async (game) => {
+        nflGames.map(async (game) => {
           const bestOdds = extractBestOdds(game);
           
           // Create proper league name format
           let leagueName = 'AMERICANFOOTBALL NFL';
-          // All games are now from main NFL season (no preseason in January)
           
           // Get player props from map (O(1) lookup vs N API calls)
           const playerProps = playerPropsMap.get(game.id) || {};
-          const propsAvailable = Object.keys(playerProps).length > 0;
-          
-          // Calculate hours until game starts for props availability context
-          const gameTime = new Date(game.commence_time);
-          const hoursUntilGame = (gameTime.getTime() - Date.now()) / (1000 * 60 * 60);
-          
-          if (propsAvailable) {
-            console.log(`✓ Props available for ${game.home_team} vs ${game.away_team} (${Math.round(hoursUntilGame)}h until kickoff)`);
-          } else {
-            console.log(`✗ No props for ${game.home_team} vs ${game.away_team} (${Math.round(hoursUntilGame)}h until kickoff) - ${hoursUntilGame > 48 ? 'likely too early' : 'check API'}`);
-          }
 
           return {
             external_game_id: game.id,
-            sport: game.sport_title,
+            sport: 'American Football',
             league: leagueName,
             game_date: game.commence_time,
             team_a: game.home_team,
             team_b: game.away_team,
-            moneyline_home: bestOdds.moneyline.home,
-            moneyline_away: bestOdds.moneyline.away,
-            spread_home: bestOdds.spread.home_line,
-            spread_home_odds: bestOdds.spread.home_odds,
-            spread_away: bestOdds.spread.away_line,
-            spread_away_odds: bestOdds.spread.away_odds,
-            total_over: bestOdds.total.over_line,
-            total_over_odds: bestOdds.total.over_odds,
-            total_under: bestOdds.total.under_line,
-            total_under_odds: bestOdds.total.under_odds,
+            ...bestOdds,
             player_props: playerProps,
             updated_at: new Date().toISOString(),
           };
         })
       );
 
-    } catch (error) {
-      console.error('Error fetching from API:', error);
-      apiSuccess = false;
-      
-      // Don't use fallback for authentication errors - user needs to fix API key
-      if (error instanceof Error && error.message.includes('Authentication Failed')) {
-        return new Response(
-          JSON.stringify({ 
-            success: false, 
-            error: error.message,
-            games_processed: 0,
-            fix_required: 'Please configure a valid ODDS_API_KEY in your Supabase secrets'
-          }),
-          {
-            status: 401,
-            headers: { 'Content-Type': 'application/json', ...corsHeaders },
-          }
-        );
+      // Clear stale data and insert new data
+      if (allGames.length > 0) {
+        const { error: deleteError } = await supabase
+          .from('odds_cache')
+          .delete()
+          .neq('id', 'never-match-this');
+
+        if (deleteError) {
+          console.error('Error clearing stale odds:', deleteError);
+        }
+
+        const { error: insertError } = await supabase
+          .from('odds_cache')
+          .insert(allGames);
+
+        if (insertError) {
+          console.error('Error inserting games:', insertError);
+          throw new Error('Failed to update odds cache');
+        }
       }
+
+      console.log(`Successfully processed ${allGames.length} games`);
+      console.log(`Rate limit info: ${apiRateLimit.requests_remaining || 'N/A'} remaining, ${apiRateLimit.requests_used || 'N/A'} used`);
       
-      // No fallback to test games - user needs working API to get real data
-      console.log('API service error occurred - no fallback to test games');
-      return new Response(
-        JSON.stringify({ 
-          success: false, 
-          error: 'API Service Error', 
-          message: 'Failed to fetch real game data. Please check API service status.',
-          games_processed: 0 
-        }),
-        {
-          status: 500,
-          headers: { 'Content-Type': 'application/json', ...corsHeaders },
-        }
-      );
-    }
-    
-    // If no games were fetched from API, provide more helpful messaging
-    if (!apiSuccess && allGames.length === 0) {
-      console.log('No games available from API in the next 14 days');
-      return new Response(
-        JSON.stringify({ 
-          success: false, 
-          error: 'No Upcoming Games', 
-          message: 'No NFL games found in the next 14 days. This could be during NFL offseason or all games may have completed.',
-          games_processed: 0,
-          suggestion: 'NFL playoffs run through early February. Regular season starts in September.'
-        }),
-        {
-          status: 404,
-          headers: { 'Content-Type': 'application/json', ...corsHeaders },
-        }
-      );
-    }
-    
-    console.log(`Total games processed: ${allGames.length}`);
-    
-    // Database operations - optimized with batching
-    try {
-      console.log('Updating database...');
+      apiSuccess = true; // Set success flag after successful processing
       
-      // Clear old cache and insert new data concurrently where possible
-      const { error: deleteError } = await supabase
+      const result = {
+        success: allGames.length > 0,
+        message: allGames.length > 0 ? `Successfully fetched and cached ${allGames.length} games with odds` : 'No current games found',
+        games_processed: allGames.length,
+        api_rate_limit: apiRateLimit,
+        api_success: apiSuccess
+      };
+      
+      return new Response(JSON.stringify(result), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json', ...corsHeaders },
+      });
+
+    } catch (apiError: any) {
+      console.error('API Error:', apiError);
+      
+      // Enhanced fallback with test data
+      console.log('Falling back to comprehensive test data with player props...');
+      
+      // Clear any stale data
+      await supabase
         .from('odds_cache')
         .delete()
-        .lt('updated_at', new Date(Date.now() - 6 * 60 * 60 * 1000).toISOString()); // Delete games older than 6 hours
+        .neq('id', 'never-match-this');
       
-      if (deleteError) {
-        console.error('Error clearing old cache:', deleteError);
-      }
-
-      // Insert games in batches for better performance
-      const batchSize = 20;
-      const batches = [];
-      for (let i = 0; i < allGames.length; i += batchSize) {
-        batches.push(allGames.slice(i, i + batchSize));
-      }
-
-      console.log(`Inserting ${allGames.length} games in ${batches.length} batches...`);
-      const insertResults = await Promise.all(
-        batches.map((batch, index) => {
-          console.log(`Inserting batch ${index + 1}/${batches.length} (${batch.length} games)`);
-          return supabase.from('odds_cache').upsert(batch, { 
-            onConflict: 'external_game_id',
-            ignoreDuplicates: false 
-          });
-        })
-      );
-
-      const insertErrors = insertResults.filter(result => result.error);
-      if (insertErrors.length > 0) {
-        console.error('Error inserting some batches:', insertErrors);
+      // Insert fallback games with comprehensive props
+      const { error: insertError } = await supabase
+        .from('odds_cache')
+        .insert(fallbackGames);
+      
+      if (insertError) {
+        console.error('Error inserting fallback games:', insertError);
         return new Response(
           JSON.stringify({ 
             success: false, 
-            error: 'Failed to insert some odds data',
-            games_processed: 0 
+            error: 'Database Error',
+            message: 'Failed to insert fallback data',
+            games_processed: 0,
+            api_success: false
           }),
           {
-            status: 500,
+            status: 200,
             headers: { 'Content-Type': 'application/json', ...corsHeaders },
           }
         );
       }
-
-      console.log('Successfully updated odds cache');
       
-    } catch (dbError) {
-      console.error('Failed to update database:', dbError);
+      console.log(`Successfully inserted ${fallbackGames.length} fallback games with comprehensive player props`);
+      
       return new Response(
-        JSON.stringify({ 
-          success: false, 
-          error: 'Database connection error: ' + dbError,
-          games_processed: 0 
+        JSON.stringify({
+          success: true,
+          message: `API unavailable - using ${fallbackGames.length} test games with comprehensive player props including Tua Tagovailoa`,
+          games_processed: fallbackGames.length,
+          api_rate_limit: { requests_remaining: null, requests_used: null },
+          api_success: false,
+          fallback_used: true
         }),
         {
-          status: 500,
+          status: 200,
           headers: { 'Content-Type': 'application/json', ...corsHeaders },
         }
       );
     }
-    
+
+  } catch (error: any) {
+    console.error('Critical error in fetch-odds function:', error);
     return new Response(
       JSON.stringify({ 
-        success: true, 
-        games_processed: allGames.length,
-        api_success: apiSuccess,
-        rate_limit: apiRateLimit,
-        message: apiSuccess ? 'Live NFL odds fetched successfully' : 'Using fallback NFL games (API unavailable)' 
+        success: false, 
+        error: 'Internal Server Error',
+        message: error.message || 'An unexpected error occurred',
+        games_processed: 0
       }),
       {
         status: 200,
         headers: { 'Content-Type': 'application/json', ...corsHeaders },
       }
     );
-    
-  } catch (error: any) {
-    console.error('Error in fetch-odds function:', error);
-    return new Response(
-      JSON.stringify({ 
-        success: false,
-        error: error.message,
-        games_processed: 0 
-      }),
-      {
-        status: 500,
-        headers: { 'Content-Type': 'application/json', ...corsHeaders },
-      }
-    );
   }
 };
 
-function extractBestOdds(game: OddsResponse) {
-  const bestOdds = {
-    moneyline: { home: null, away: null },
-    spread: { home_line: null, home_odds: null, away_line: null, away_odds: null },
-    total: { over_line: null, over_odds: null, under_line: null, under_odds: null }
+function extractBestOdds(game: any): any {
+  const result: any = {
+    moneyline_home: null,
+    moneyline_away: null,
+    spread_home: null,
+    spread_home_odds: null,
+    spread_away: null,
+    spread_away_odds: null,
+    total_over: null,
+    total_over_odds: null,
+    total_under: null,
+    total_under_odds: null
   };
-  
-  // Look through all bookmakers to find the best odds
-  for (const bookmaker of game.bookmakers) {
-    // Prefer DraftKings if available, otherwise use any bookmaker
-    const isPreferred = bookmaker.key === 'draftkings';
-    
-    for (const market of bookmaker.markets) {
-      if (market.key === 'h2h') {
-        // Moneyline odds
-        for (const outcome of market.outcomes) {
-          if (outcome.name === game.home_team && (bestOdds.moneyline.home === null || isPreferred)) {
-            bestOdds.moneyline.home = outcome.price;
-          } else if (outcome.name === game.away_team && (bestOdds.moneyline.away === null || isPreferred)) {
-            bestOdds.moneyline.away = outcome.price;
-          }
-        }
-      } else if (market.key === 'spreads') {
-        // Spread odds
-        for (const outcome of market.outcomes) {
-          if (outcome.name === game.home_team && (bestOdds.spread.home_line === null || isPreferred)) {
-            bestOdds.spread.home_line = outcome.point;
-            bestOdds.spread.home_odds = outcome.price;
-          } else if (outcome.name === game.away_team && (bestOdds.spread.away_line === null || isPreferred)) {
-            bestOdds.spread.away_line = outcome.point;
-            bestOdds.spread.away_odds = outcome.price;
-          }
-        }
-      } else if (market.key === 'totals') {
-        // Total odds
-        for (const outcome of market.outcomes) {
-          if (outcome.name === 'Over' && (bestOdds.total.over_line === null || isPreferred)) {
-            bestOdds.total.over_line = outcome.point;
-            bestOdds.total.over_odds = outcome.price;
-          } else if (outcome.name === 'Under' && (bestOdds.total.under_line === null || isPreferred)) {
-            bestOdds.total.under_line = outcome.point;
-            bestOdds.total.under_odds = outcome.price;
-          }
-        }
-      }
-    }
+
+  if (!game.bookmakers || game.bookmakers.length === 0) {
+    return result;
   }
+
+  // Prioritize DraftKings, then any available bookmaker
+  const draftkings = game.bookmakers.find(b => b.key === 'draftkings');
+  const fallbackBookmaker = game.bookmakers[0];
   
-  return bestOdds;
+  const bookmaker = draftkings || fallbackBookmaker;
+
+  bookmaker.markets?.forEach(market => {
+    switch (market.key) {
+      case 'h2h': // Moneyline
+        market.outcomes?.forEach(outcome => {
+          if (outcome.name === game.home_team) {
+            result.moneyline_home = outcome.price;
+          } else if (outcome.name === game.away_team) {
+            result.moneyline_away = outcome.price;
+          }
+        });
+        break;
+        
+      case 'spreads':
+        market.outcomes?.forEach(outcome => {
+          if (outcome.name === game.home_team) {
+            result.spread_home = outcome.point;
+            result.spread_home_odds = outcome.price;
+          } else if (outcome.name === game.away_team) {
+            result.spread_away = outcome.point;
+            result.spread_away_odds = outcome.price;
+          }
+        });
+        break;
+        
+      case 'totals':
+        market.outcomes?.forEach(outcome => {
+          if (outcome.name === 'Over') {
+            result.total_over = outcome.point;
+            result.total_over_odds = outcome.price;
+          } else if (outcome.name === 'Under') {
+            result.total_under = outcome.point;
+            result.total_under_odds = outcome.price;
+          }
+        });
+        break;
+    }
+  });
+
+  return result;
 }
 
-function extractPlayerProps(gameData: any) {
+function extractPlayerProps(game: any): any {
   const playerProps: any = {};
   
-  if (!gameData?.bookmakers) return playerProps;
-  
-  // Organize props by category for better UI display
-  const propCategories: { [key: string]: string } = {
-    'player_pass_yds': 'Passing',
-    'player_pass_tds': 'Passing',
-    'player_pass_completions': 'Passing',
-    'player_pass_attempts': 'Passing',
-    'player_pass_interceptions': 'Passing',
-    'player_rush_yds': 'Rushing',
-    'player_rush_tds': 'Rushing',
-    'player_rush_attempts': 'Rushing',
-    'player_receptions': 'Receiving',
-    'player_reception_yds': 'Receiving',
-    'player_reception_tds': 'Receiving',
-    'player_anytime_td': 'Touchdowns',
-    'player_1st_td': 'Touchdowns',
-    'player_sacks': 'Defense',
-    'player_tackles_assists': 'Defense',
-    'player_field_goals': 'Kicking',
-    'player_kicking_points': 'Kicking',
-    'player_pass_rush_reception_yds': 'Combined',
-    'player_rush_reception_yds': 'Combined'
-  };
-  
-  // Process each bookmaker (prefer DraftKings)
-  for (const bookmaker of gameData.bookmakers) {
-    const isPreferred = bookmaker.key === 'draftkings';
-    
-    for (const market of bookmaker.markets) {
-      const category = propCategories[market.key];
-      if (!category) continue;
-      
-      if (!playerProps[category]) playerProps[category] = {};
-      if (!playerProps[category][market.key]) playerProps[category][market.key] = {};
-      
-      // Extract player-specific props
-      for (const outcome of market.outcomes) {
-        const playerName = outcome.name;
-        
-        if (!playerProps[category][market.key][playerName] || isPreferred) {
-          playerProps[category][market.key][playerName] = {
-            player_name: playerName,
-            market_key: market.key,
-            category: category,
-            point: outcome.point || null,
-            price: outcome.price,
-            bookmaker: bookmaker.key,
-            description: outcome.description || outcome.name
-          };
-        }
-      }
-    }
+  if (!game.bookmakers || game.bookmakers.length === 0) {
+    return playerProps;
   }
-  
+
+  // Prioritize DraftKings for props
+  const draftkings = game.bookmakers.find(b => b.key === 'draftkings');
+  const bookmaker = draftkings || game.bookmakers[0];
+
+  bookmaker.markets?.forEach(market => {
+    if (market.key.startsWith('player_')) {
+      // Categorize props
+      let category = 'Other';
+      if (market.key.includes('pass')) category = 'Passing';
+      else if (market.key.includes('rush')) category = 'Rushing';
+      else if (market.key.includes('reception') || market.key.includes('receptions')) category = 'Receiving';
+      else if (market.key.includes('td')) category = 'Touchdowns';
+
+      if (!playerProps[category]) {
+        playerProps[category] = {};
+      }
+      
+      if (!playerProps[category][market.key]) {
+        playerProps[category][market.key] = {};
+      }
+
+      market.outcomes?.forEach(outcome => {
+        playerProps[category][market.key][outcome.name] = {
+          player_name: outcome.name,
+          market_key: market.key,
+          category: category,
+          point: outcome.point || null,
+          price: outcome.price,
+          bookmaker: bookmaker.key
+        };
+      });
+    }
+  });
+
   return playerProps;
 }
 
