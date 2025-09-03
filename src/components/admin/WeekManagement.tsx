@@ -5,7 +5,8 @@ import { Badge } from '@/components/ui/badge';
 import { supabase } from '@/integrations/supabase/client';
 import { Week } from '@/types/database';
 import { toast } from 'sonner';
-import { Calendar, Lock, Unlock, CheckCircle } from 'lucide-react';
+import { Calendar, Lock, Unlock, CheckCircle, Clock } from 'lucide-react';
+import { getNextSundayLockTime, formatLockTime } from '@/lib/dateUtils';
 
 export const WeekManagement = () => {
   const [weeks, setWeeks] = useState<Week[]>([]);
@@ -45,6 +46,27 @@ export const WeekManagement = () => {
     } catch (error) {
       console.error('Error updating week status:', error);
       toast.error('Failed to update week status');
+    }
+  };
+
+  const setDefaultLockTime = async (weekId: string) => {
+    try {
+      const nextSundayLock = getNextSundayLockTime();
+      
+      const { error } = await supabase
+        .from('weeks')
+        .update({ 
+          locks_at: nextSundayLock.toISOString()
+        })
+        .eq('id', weekId);
+
+      if (error) throw error;
+      
+      toast.success('Lock time set to next Sunday 12:00 PM ET');
+      fetchWeeks();
+    } catch (error) {
+      console.error('Error updating lock time:', error);
+      toast.error('Failed to update lock time');
     }
   };
 
@@ -94,7 +116,7 @@ export const WeekManagement = () => {
                 </div>
                 <div>
                   <p className="text-sm font-medium text-muted-foreground">Locks At</p>
-                  <p>{new Date(week.locks_at).toLocaleString()}</p>
+                  <p>{formatLockTime(new Date(week.locks_at))}</p>
                 </div>
                 <div>
                   <p className="text-sm font-medium text-muted-foreground">Stake Amount</p>
@@ -108,7 +130,16 @@ export const WeekManagement = () => {
                 )}
               </div>
               
-              <div className="flex gap-2">
+              <div className="flex gap-2 flex-wrap">
+                <Button
+                  onClick={() => setDefaultLockTime(week.id)}
+                  variant="secondary"
+                  size="sm"
+                >
+                  <Clock className="h-4 w-4 mr-2" />
+                  Set Sunday 12PM ET
+                </Button>
+                
                 {week.status === 'OPEN' && (
                   <Button
                     onClick={() => updateWeekStatus(week.id, 'LOCKED')}

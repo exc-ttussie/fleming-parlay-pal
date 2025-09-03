@@ -13,8 +13,14 @@ import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
 import type { Leg } from '@/types/database';
 
+interface LegWithProfile extends Leg {
+  profiles?: {
+    name: string;
+  };
+}
+
 interface LegsTableProps {
-  legs: Leg[];
+  legs: LegWithProfile[];
   onRefresh: () => void;
 }
 
@@ -57,6 +63,7 @@ export const LegsTable = ({ legs, onRefresh }: LegsTableProps) => {
       <Table>
         <TableHeader>
           <TableRow>
+            <TableHead>User</TableHead>
             <TableHead>Game</TableHead>
             <TableHead>Player/Market</TableHead>
             <TableHead>Selection</TableHead>
@@ -69,6 +76,11 @@ export const LegsTable = ({ legs, onRefresh }: LegsTableProps) => {
         <TableBody>
           {legs.map((leg) => (
             <TableRow key={leg.id}>
+              <TableCell>
+                <div className="font-medium">
+                  {leg.profiles?.name || 'Unknown User'}
+                </div>
+              </TableCell>
               <TableCell>
                 <div>
                   <div className="font-medium">{leg.game_desc}</div>
