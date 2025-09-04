@@ -3,10 +3,12 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Textarea } from '@/components/ui/textarea';
+import { Checkbox } from '@/components/ui/checkbox';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { supabase } from '@/integrations/supabase/client';
 import { Leg } from '@/types/database';
 import { toast } from 'sonner';
-import { Check, X, AlertCircle } from 'lucide-react';
+import { Check, X, AlertCircle, CheckSquare, Square, Filter } from 'lucide-react';
 
 interface LegWithProfile extends Leg {
   profiles?: { name: string; user_id: string } | null;
@@ -16,14 +18,22 @@ export const LegApproval = () => {
   const [legs, setLegs] = useState<LegWithProfile[]>([]);
   const [loading, setLoading] = useState(true);
   const [notes, setNotes] = useState<{ [key: string]: string }>({});
+  const [selectedLegs, setSelectedLegs] = useState<Set<string>>(new Set());
+  const [statusFilter, setStatusFilter] = useState<string>('all');
 
   const fetchPendingLegs = async () => {
     try {
-      // First get pending legs
+      // Fetch legs based on status filter
+      const statusConditions = statusFilter === 'all' 
+        ? ['PENDING', 'CONFLICT'] as const
+        : statusFilter === 'pending'
+        ? ['PENDING'] as const
+        : ['CONFLICT'] as const;
+        
       const { data: legsData, error: legsError } = await supabase
         .from('legs')
         .select('*')
-        .in('status', ['PENDING', 'CONFLICT'])
+        .in('status', statusConditions)
         .order('created_at', { ascending: true });
 
       if (legsError) throw legsError;
@@ -75,15 +85,74 @@ export const LegApproval = () => {
       toast.success(`Leg ${status.toLowerCase()}`);
       fetchPendingLegs();
       setNotes(prev => ({ ...prev, [legId]: '' }));
+      setSelectedLegs(prev => {
+        const newSet = new Set(prev);
+        newSet.delete(legId);
+        return newSet;
+      });
     } catch (error) {
       console.error('Error updating leg status:', error);
       toast.error('Failed to update leg status');
     }
   };
 
+  const batchUpdateLegs = async (status: 'OK' | 'DUPLICATE' | 'CONFLICT' | 'REJECTED') => {
+    if (selectedLegs.size === 0) {
+      toast.error('No legs selected');
+      return;
+    }
+
+    try {
+      const updates = Array.from(selectedLegs).map(legId => 
+        supabase
+          .from('legs')
+          .update({ 
+            status,
+            notes: notes[legId] || null 
+          })
+          .eq('id', legId)
+      );
+
+      const results = await Promise.all(updates);
+      
+      const errors = results.filter(result => result.error);
+      if (errors.length > 0) {
+        throw new Error(`Failed to update ${errors.length} legs`);
+      }
+
+      toast.success(`${selectedLegs.size} legs ${status.toLowerCase()}`);
+      setSelectedLegs(new Set());
+      fetchPendingLegs();
+    } catch (error) {
+      console.error('Error batch updating legs:', error);
+      toast.error('Failed to update selected legs');
+    }
+  };
+
+  const toggleLegSelection = (legId: string) => {
+    setSelectedLegs(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(legId)) {
+        newSet.delete(legId);
+      } else {
+        newSet.add(legId);
+      }
+      return newSet;
+    });
+  };
+
+  const selectAllLegs = () => {
+    const allLegIds = legs.map(leg => leg.id);
+    setSelectedLegs(new Set(allLegIds));
+  };
+
+  const clearSelection = () => {
+    setSelectedLegs(new Set());
+  };
+
   useEffect(() => {
     fetchPendingLegs();
-  }, []);
+  }, [statusFilter]);
 
   const getStatusBadge = (status: string) => {
     const variants = {
@@ -106,9 +175,73 @@ export const LegApproval = () => {
   return (
     <div className="p-6">
       <div className="flex items-center justify-between mb-6">
-        <h1 className="text-3xl font-bold">Leg Approval</h1>
-        <Badge variant="secondary">{legs.length} pending</Badge>
+        <div>
+          <h1 className="text-3xl font-bold">Leg Approval</h1>
+          <p className="text-muted-foreground">Review and manage leg submissions</p>
+        </div>
+        <div className="flex items-center gap-4">
+          <Select value={statusFilter} onValueChange={setStatusFilter}>
+            <SelectTrigger className="w-40">
+              <SelectValue placeholder="Filter by status" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Pending</SelectItem>
+              <SelectItem value="pending">Pending Only</SelectItem>
+              <SelectItem value="conflict">Conflicts Only</SelectItem>
+            </SelectContent>
+          </Select>
+          <Badge variant="secondary">{legs.length} legs</Badge>
+        </div>
       </div>
+
+      {/* Batch Actions */}
+      {selectedLegs.size > 0 && (
+        <Card className="mb-6 border-primary/20">
+          <CardContent className="p-4">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-4">
+                <span className="font-medium">{selectedLegs.size} selected</span>
+                <Button variant="outline" size="sm" onClick={clearSelection}>
+                  Clear
+                </Button>
+              </div>
+              
+              <div className="flex items-center gap-2">
+                <Button
+                  onClick={() => batchUpdateLegs('OK')}
+                  variant="default"
+                  size="sm"
+                >
+                  <Check className="h-4 w-4 mr-2" />
+                  Approve All
+                </Button>
+                <Button
+                  onClick={() => batchUpdateLegs('DUPLICATE')}
+                  variant="outline"
+                  size="sm"
+                >
+                  Mark Duplicate
+                </Button>
+                <Button
+                  onClick={() => batchUpdateLegs('CONFLICT')}
+                  variant="outline"
+                  size="sm"
+                >
+                  Flag Conflict
+                </Button>
+                <Button
+                  onClick={() => batchUpdateLegs('REJECTED')}
+                  variant="destructive"
+                  size="sm"
+                >
+                  <X className="h-4 w-4 mr-2" />
+                  Reject All
+                </Button>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {legs.length === 0 ? (
         <Card>
@@ -121,15 +254,49 @@ export const LegApproval = () => {
           </CardContent>
         </Card>
       ) : (
-        <div className="grid gap-4">
+        <div className="space-y-4">
+          {/* Select All Option */}
+          <Card>
+            <CardContent className="p-4">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center space-x-2">
+                  <Checkbox 
+                    checked={selectedLegs.size === legs.length && legs.length > 0}
+                    onCheckedChange={(checked) => {
+                      if (checked) {
+                        selectAllLegs();
+                      } else {
+                        clearSelection();
+                      }
+                    }}
+                  />
+                  <label className="text-sm font-medium">
+                    Select All ({legs.length} legs)
+                  </label>
+                </div>
+                
+                <Button variant="ghost" size="sm" onClick={fetchPendingLegs}>
+                  <Filter className="h-4 w-4 mr-2" />
+                  Refresh
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+
           {legs.map((leg) => (
-            <Card key={leg.id} className="relative">
+            <Card key={leg.id} className={`relative ${selectedLegs.has(leg.id) ? 'ring-2 ring-primary' : ''}`}>
               <CardHeader>
                 <div className="flex items-center justify-between">
-                  <CardTitle className="flex items-center gap-2">
-                    <AlertCircle className="h-5 w-5" />
-                    {leg.game_desc}
-                  </CardTitle>
+                  <div className="flex items-center gap-3">
+                    <Checkbox 
+                      checked={selectedLegs.has(leg.id)}
+                      onCheckedChange={() => toggleLegSelection(leg.id)}
+                    />
+                    <CardTitle className="flex items-center gap-2">
+                      <AlertCircle className="h-5 w-5" />
+                      {leg.game_desc}
+                    </CardTitle>
+                  </div>
                   {getStatusBadge(leg.status)}
                 </div>
                 <p className="text-sm text-muted-foreground">
