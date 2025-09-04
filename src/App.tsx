@@ -12,6 +12,7 @@ import { WeekManagement } from "@/components/admin/WeekManagement";
 import { LegApproval } from "@/components/admin/LegApproval";
 import { UserManagement } from "@/components/admin/UserManagement";
 import { GroupCoordination } from "@/components/group/GroupCoordination";
+import { AdminSettings } from "@/components/admin/AdminSettings";
 import { AdminDashboardHome } from "@/components/admin/AdminDashboardHome";
 
 const queryClient = new QueryClient();
@@ -32,7 +33,7 @@ const App = () => (
                 <Route path="legs" element={<LegApproval />} />
                 <Route path="users" element={<UserManagement />} />
                 <Route path="analytics" element={<div className="p-6">Analytics coming soon...</div>} />
-                <Route path="settings" element={<div className="p-6">Settings coming soon...</div>} />
+                <Route path="settings" element={<AdminSettings />} />
               </Route>
               <Route path="/group" element={<GroupCoordination />} />
               {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}

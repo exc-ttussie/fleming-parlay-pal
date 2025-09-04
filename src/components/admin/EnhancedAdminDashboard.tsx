@@ -39,10 +39,12 @@ export const EnhancedAdminDashboard = () => {
     weekStatus: 'UNKNOWN'
   });
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   const fetchDashboardStats = async () => {
     try {
       setLoading(true);
+      setError(null);
       
       // Fetch user count
       const { count: userCount } = await supabase
@@ -83,6 +85,7 @@ export const EnhancedAdminDashboard = () => {
       });
     } catch (error) {
       console.error('Error fetching dashboard stats:', error);
+      setError(error instanceof Error ? error.message : 'Failed to load dashboard data');
     } finally {
       setLoading(false);
     }
@@ -127,6 +130,17 @@ export const EnhancedAdminDashboard = () => {
     return (
       <div className="flex items-center justify-center p-8">
         <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="flex items-center justify-center p-8">
+        <div className="text-center">
+          <p className="text-muted-foreground mb-4">{error}</p>
+          <Button onClick={fetchDashboardStats}>Try Again</Button>
+        </div>
       </div>
     );
   }

@@ -4,9 +4,10 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { formatCurrency, parlayDecimal, parlayPayout } from "@/lib/parlay";
 import { getNextSundayLockTime } from "@/lib/dateUtils";
-import { Clock, Users, DollarSign, TrendingUp, RefreshCw } from "lucide-react";
+import { Clock, Users, DollarSign, TrendingUp, RefreshCw, AlertCircle } from "lucide-react";
 import { LegsTable } from "./LegsTable";
 import { EnhancedCreateLegModal } from "./EnhancedCreateLegModal";
+import { LoadingState, ErrorState } from "@/components/ui/loading-state";
 import { useCurrentWeek } from "@/hooks/useCurrentWeek";
 import { useLegs } from "@/hooks/useLegs";
 
@@ -58,10 +59,18 @@ export const Dashboard = () => {
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4"></div>
-          <p className="text-muted-foreground">Loading...</p>
-        </div>
+        <LoadingState message="Loading dashboard..." size="lg" />
+      </div>
+    );
+  }
+
+  if (!currentWeek && !weekLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <ErrorState 
+          message="No active week found. Please contact your administrator."
+          onRetry={handleRefresh}
+        />
       </div>
     );
   }
@@ -69,6 +78,25 @@ export const Dashboard = () => {
   return (
     <div className="p-4">
       <div className="max-w-7xl mx-auto space-y-6">
+
+        {/* Week Status Alert */}
+        {currentWeek?.status !== 'OPEN' && (
+          <Card className="border-orange-200 bg-orange-50 dark:border-orange-800 dark:bg-orange-950">
+            <CardContent className="p-4">
+              <div className="flex items-center space-x-2">
+                <AlertCircle className="w-5 h-5 text-orange-600" />
+                <div>
+                  <p className="font-medium text-orange-800 dark:text-orange-300">
+                    Week {currentWeek?.week_number} is {currentWeek?.status.toLowerCase()}
+                  </p>
+                  <p className="text-sm text-orange-600 dark:text-orange-400">
+                    {currentWeek?.status === 'LOCKED' ? 'No more submissions allowed' : 'Week has been finalized'}
+                  </p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        )}
 
         {/* Status Cards */}
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
@@ -185,14 +213,10 @@ export const Dashboard = () => {
           </CardHeader>
           <CardContent>
             {weekError || legsError ? (
-              <div className="text-center py-4">
-                <p className="text-muted-foreground">
-                  {weekError || legsError}
-                </p>
-                <Button variant="outline" onClick={handleRefresh} className="mt-2">
-                  Try Again
-                </Button>
-              </div>
+              <ErrorState 
+                message={weekError || legsError || "Failed to load data"}
+                onRetry={handleRefresh}
+              />
             ) : (
               <LegsTable legs={legs} onRefresh={handleRefresh} />
             )}

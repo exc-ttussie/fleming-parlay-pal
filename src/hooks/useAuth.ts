@@ -36,19 +36,26 @@ export const useAuth = () => {
 
   const createUserProfile = async (user: User) => {
     try {
+      // Use upsert with proper conflict resolution to handle race conditions
       const { error } = await supabase
         .from('profiles')
         .upsert({
           user_id: user.id,
           email: user.email || '',
           name: user.user_metadata?.full_name || user.email?.split('@')[0] || 'User',
+        }, {
+          onConflict: 'user_id',
+          ignoreDuplicates: false
         });
         
-      if (error) {
+      if (error && error.code !== '23505') { // Ignore unique constraint violations
         console.error('Error creating profile:', error);
       }
-    } catch (error) {
-      console.error('Error creating profile:', error);
+    } catch (error: any) {
+      // Gracefully handle unique constraint violations (race condition)
+      if (error?.code !== '23505') {
+        console.error('Error creating profile:', error);
+      }
     }
   };
 

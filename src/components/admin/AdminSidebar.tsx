@@ -15,10 +15,10 @@ import {
 } from "@/components/ui/sidebar";
 
 const adminItems = [
+  { title: "Dashboard", url: "/admin", icon: BarChart3 },
   { title: "Week Management", url: "/admin/weeks", icon: Calendar },
   { title: "User Management", url: "/admin/users", icon: Users },
   { title: "Leg Approval", url: "/admin/legs", icon: Shield },
-  { title: "Analytics", url: "/admin/analytics", icon: BarChart3 },
   { title: "Settings", url: "/admin/settings", icon: Settings },
 ];
 
