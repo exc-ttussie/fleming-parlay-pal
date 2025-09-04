@@ -52,7 +52,7 @@ export function UniversalHeader({ showSidebarTrigger, sidebarTrigger }: Universa
 
   const handleViewToggle = () => {
     if (location.pathname.startsWith('/admin')) {
-      navigate('/');
+      navigate('/?view=user');
     } else {
       navigate('/admin');
     }

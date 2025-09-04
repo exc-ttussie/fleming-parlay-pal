@@ -1,12 +1,14 @@
 import { LoginPage } from "@/components/auth/LoginPage";
 import { Dashboard } from "@/components/dashboard/Dashboard";
-import { Navigate } from "react-router-dom";
+import { Navigate, useSearchParams } from "react-router-dom";
 import { useAuthContext } from "@/components/AuthProvider";
 import { useUserRole } from "@/hooks/useUserRole";
 
 const Index = () => {
   const { user, loading } = useAuthContext();
   const { isAdmin, loading: roleLoading } = useUserRole();
+  const [searchParams] = useSearchParams();
+  const viewAsUser = searchParams.get('view') === 'user';
 
   if (loading || roleLoading) {
     return (
@@ -21,6 +23,11 @@ const Index = () => {
 
   if (!user) {
     return <LoginPage />;
+  }
+
+  // If admin wants to view as user, show Dashboard
+  if (isAdmin && viewAsUser) {
+    return <Dashboard />;
   }
 
   return isAdmin ? <Navigate to="/admin" replace /> : <Dashboard />;

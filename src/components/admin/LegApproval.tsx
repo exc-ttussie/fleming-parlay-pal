@@ -24,17 +24,23 @@ export const LegApproval = () => {
   const fetchPendingLegs = async () => {
     try {
       // Fetch legs based on status filter
-      const statusConditions = statusFilter === 'all' 
-        ? ['PENDING', 'CONFLICT'] as const
-        : statusFilter === 'pending'
-        ? ['PENDING'] as const
-        : ['CONFLICT'] as const;
+      let query = supabase.from('legs').select('*');
+      
+      if (statusFilter === 'all') {
+        query = query.in('status', ['PENDING', 'CONFLICT']);
+      } else if (statusFilter === 'pending') {
+        query = query.eq('status', 'PENDING');
+      } else if (statusFilter === 'conflict') {
+        query = query.eq('status', 'CONFLICT');
+      } else if (statusFilter === 'approved') {
+        query = query.eq('status', 'OK');
+      } else if (statusFilter === 'all_statuses') {
+        // No filter, get all statuses
+      } else {
+        query = query.in('status', ['PENDING', 'CONFLICT']);
+      }
         
-      const { data: legsData, error: legsError } = await supabase
-        .from('legs')
-        .select('*')
-        .in('status', statusConditions)
-        .order('created_at', { ascending: true });
+      const { data: legsData, error: legsError } = await query.order('created_at', { ascending: false });
 
       if (legsError) throw legsError;
 
@@ -70,7 +76,7 @@ export const LegApproval = () => {
     }
   };
 
-  const updateLegStatus = async (legId: string, status: 'OK' | 'DUPLICATE' | 'CONFLICT' | 'REJECTED') => {
+  const updateLegStatus = async (legId: string, status: 'OK' | 'DUPLICATE' | 'CONFLICT' | 'REJECTED' | 'PENDING') => {
     try {
       const { error } = await supabase
         .from('legs')
@@ -96,7 +102,7 @@ export const LegApproval = () => {
     }
   };
 
-  const batchUpdateLegs = async (status: 'OK' | 'DUPLICATE' | 'CONFLICT' | 'REJECTED') => {
+  const batchUpdateLegs = async (status: 'OK' | 'DUPLICATE' | 'CONFLICT' | 'REJECTED' | 'PENDING') => {
     if (selectedLegs.size === 0) {
       toast.error('No legs selected');
       return;
@@ -188,6 +194,8 @@ export const LegApproval = () => {
               <SelectItem value="all">All Pending</SelectItem>
               <SelectItem value="pending">Pending Only</SelectItem>
               <SelectItem value="conflict">Conflicts Only</SelectItem>
+              <SelectItem value="approved">Approved Only</SelectItem>
+              <SelectItem value="all_statuses">All Statuses</SelectItem>
             </SelectContent>
           </Select>
           <Badge variant="secondary">{legs.length} legs</Badge>
@@ -350,36 +358,49 @@ export const LegApproval = () => {
                 </div>
                 
                 <div className="flex gap-2">
-                  <Button
-                    onClick={() => updateLegStatus(leg.id, 'OK')}
-                    variant="default"
-                    size="sm"
-                  >
-                    <Check className="h-4 w-4 mr-2" />
-                    Approve
-                  </Button>
-                  <Button
-                    onClick={() => updateLegStatus(leg.id, 'DUPLICATE')}
-                    variant="outline"
-                    size="sm"
-                  >
-                    Mark Duplicate
-                  </Button>
-                  <Button
-                    onClick={() => updateLegStatus(leg.id, 'CONFLICT')}
-                    variant="outline"
-                    size="sm"
-                  >
-                    Flag Conflict
-                  </Button>
-                  <Button
-                    onClick={() => updateLegStatus(leg.id, 'REJECTED')}
-                    variant="destructive"
-                    size="sm"
-                  >
-                    <X className="h-4 w-4 mr-2" />
-                    Reject
-                  </Button>
+                  {leg.status === 'OK' ? (
+                    <Button
+                      onClick={() => updateLegStatus(leg.id, 'PENDING')}
+                      variant="outline"
+                      size="sm"
+                    >
+                      <AlertCircle className="h-4 w-4 mr-2" />
+                      Revert to Pending
+                    </Button>
+                  ) : (
+                    <>
+                      <Button
+                        onClick={() => updateLegStatus(leg.id, 'OK')}
+                        variant="default"
+                        size="sm"
+                      >
+                        <Check className="h-4 w-4 mr-2" />
+                        Approve
+                      </Button>
+                      <Button
+                        onClick={() => updateLegStatus(leg.id, 'DUPLICATE')}
+                        variant="outline"
+                        size="sm"
+                      >
+                        Mark Duplicate
+                      </Button>
+                      <Button
+                        onClick={() => updateLegStatus(leg.id, 'CONFLICT')}
+                        variant="outline"
+                        size="sm"
+                      >
+                        Flag Conflict
+                      </Button>
+                      <Button
+                        onClick={() => updateLegStatus(leg.id, 'REJECTED')}
+                        variant="destructive"
+                        size="sm"
+                      >
+                        <X className="h-4 w-4 mr-2" />
+                        Reject
+                      </Button>
+                    </>
+                  )}
                 </div>
               </CardContent>
             </Card>
