@@ -1,6 +1,6 @@
 import { LoginPage } from "@/components/auth/LoginPage";
 import { Dashboard } from "@/components/dashboard/Dashboard";
-import { GroupCoordination } from "@/components/group/GroupCoordination";
+import { Navigate } from "react-router-dom";
 import { useAuthContext } from "@/components/AuthProvider";
 import { useUserRole } from "@/hooks/useUserRole";
 
@@ -23,7 +23,7 @@ const Index = () => {
     return <LoginPage />;
   }
 
-  return isAdmin ? <GroupCoordination /> : <Dashboard />;
+  return isAdmin ? <Navigate to="/admin" replace /> : <Dashboard />;
 };
 
 export default Index;
