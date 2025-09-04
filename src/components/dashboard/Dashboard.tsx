@@ -1,124 +1,24 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { supabase } from "@/integrations/supabase/client";
-import { useAuthContext } from "@/components/AuthProvider";
-import { signOut } from "@/lib/auth";
-import { formatCurrency, americanToDecimal, parlayDecimal, parlayPayout } from "@/lib/parlay";
+import { formatCurrency, parlayDecimal, parlayPayout } from "@/lib/parlay";
 import { getNextSundayLockTime } from "@/lib/dateUtils";
-import { Clock, Users, DollarSign, TrendingUp, LogOut } from "lucide-react";
+import { Clock, Users, DollarSign, TrendingUp, RefreshCw } from "lucide-react";
 import { LegsTable } from "./LegsTable";
 import { EnhancedCreateLegModal } from "./EnhancedCreateLegModal";
-
-import type { Leg, Week } from '@/types/database';
-
-interface WeekWithSeason extends Week {
-  seasons?: {
-    label: string;
-  };
-}
-
-interface LegWithProfile extends Leg {
-  profiles?: {
-    name: string;
-  };
-}
+import { useCurrentWeek } from "@/hooks/useCurrentWeek";
+import { useLegs } from "@/hooks/useLegs";
 
 export const Dashboard = () => {
-  const { user } = useAuthContext();
-  const [currentWeek, setCurrentWeek] = useState<WeekWithSeason | null>(null);
-  const [legs, setLegs] = useState<LegWithProfile[]>([]);
-  const [userLeg, setUserLeg] = useState<LegWithProfile | null>(null);
   const [showSubmitModal, setShowSubmitModal] = useState(false);
-  const [loading, setLoading] = useState(true);
+  const { currentWeek, loading: weekLoading, error: weekError, refetch: refetchWeek } = useCurrentWeek();
+  const { legs, userLeg, loading: legsLoading, error: legsError, refetch: refetchLegs } = useLegs(currentWeek?.id || null);
 
-  const fetchCurrentWeek = async () => {
-    try {
-      const now = new Date();
-      
-      // First try to find a week that matches current time constraints
-      let { data: weeks, error } = await supabase
-        .from('weeks')
-        .select(`
-          *,
-          seasons:season_id (
-            label
-          )
-        `)
-        .eq('status', 'OPEN')
-        .lte('opens_at', now.toISOString())
-        .gt('locks_at', now.toISOString())
-        .order('opens_at', { ascending: false })
-        .limit(1);
-
-      if (error) throw error;
-      
-      // If no current week found, fall back to most recent OPEN week (for development)
-      if (!weeks || weeks.length === 0) {
-        const { data: fallbackWeeks, error: fallbackError } = await supabase
-          .from('weeks')
-          .select(`
-            *,
-            seasons:season_id (
-              label
-            )
-          `)
-          .eq('status', 'OPEN')
-          .order('opens_at', { ascending: false })
-          .limit(1);
-
-        if (fallbackError) throw fallbackError;
-        weeks = fallbackWeeks;
-      }
-      
-      if (weeks && weeks.length > 0) {
-        setCurrentWeek(weeks[0]);
-        await fetchLegs(weeks[0].id);
-      }
-    } catch (error) {
-      console.error('Error fetching current week:', error);
-    } finally {
-      setLoading(false);
-    }
+  const handleRefresh = () => {
+    refetchWeek();
+    refetchLegs();
   };
-
-  const fetchLegs = async (weekId: string) => {
-    try {
-      // First fetch legs
-      const { data: legsData, error: legsError } = await supabase
-        .from('legs')
-        .select('*')
-        .eq('week_id', weekId);
-
-      if (legsError) throw legsError;
-
-      // Then fetch profiles for the users
-      const userIds = legsData?.map(leg => leg.user_id) || [];
-      const { data: profilesData, error: profilesError } = await supabase
-        .from('safe_profiles')
-        .select('user_id, name')
-        .in('user_id', userIds);
-
-      if (profilesError) throw profilesError;
-
-      // Combine the data
-      const legsWithProfiles = legsData?.map(leg => ({
-        ...leg,
-        profiles: profilesData?.find(profile => profile.user_id === leg.user_id) || { name: 'Unknown User' }
-      })) || [];
-
-      setLegs(legsWithProfiles);
-      const myLeg = legsWithProfiles?.find(leg => leg.user_id === user?.id);
-      setUserLeg(myLeg || null);
-    } catch (error) {
-      console.error('Error fetching legs:', error);
-    }
-  };
-
-  useEffect(() => {
-    fetchCurrentWeek();
-  }, []);
 
   const getTimeUntilLock = () => {
     const lockTime = getNextSundayLockTime();
@@ -153,6 +53,7 @@ export const Dashboard = () => {
   };
 
   const parlay = calculateParlay();
+  const loading = weekLoading || legsLoading;
 
   if (loading) {
     return (
@@ -166,18 +67,8 @@ export const Dashboard = () => {
   }
 
   return (
-    <div className="min-h-screen bg-background p-4">
+    <div className="p-4">
       <div className="max-w-7xl mx-auto space-y-6">
-        {/* Header */}
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-3xl font-bold text-foreground">Fleming Parlay Coordinator</h1>
-          </div>
-          <Button variant="outline" onClick={() => signOut()}>
-            <LogOut className="w-4 h-4 mr-2" />
-            Sign Out
-          </Button>
-        </div>
 
         {/* Status Cards */}
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
@@ -281,13 +172,30 @@ export const Dashboard = () => {
         {/* Group Legs */}
         <Card>
           <CardHeader>
-            <CardTitle>Group Legs</CardTitle>
+            <CardTitle className="flex items-center justify-between">
+              Group Legs
+              <Button variant="ghost" size="sm" onClick={handleRefresh}>
+                <RefreshCw className="h-4 w-4 mr-2" />
+                Refresh
+              </Button>
+            </CardTitle>
             <CardDescription>
               All submitted legs for this week
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <LegsTable legs={legs} onRefresh={fetchCurrentWeek} />
+            {weekError || legsError ? (
+              <div className="text-center py-4">
+                <p className="text-muted-foreground">
+                  {weekError || legsError}
+                </p>
+                <Button variant="outline" onClick={handleRefresh} className="mt-2">
+                  Try Again
+                </Button>
+              </div>
+            ) : (
+              <LegsTable legs={legs} onRefresh={handleRefresh} />
+            )}
           </CardContent>
         </Card>
 
@@ -326,7 +234,7 @@ export const Dashboard = () => {
         <EnhancedCreateLegModal
           open={showSubmitModal}
           onOpenChange={setShowSubmitModal}
-          onLegCreated={fetchCurrentWeek}
+          onLegCreated={handleRefresh}
           weekId={currentWeek.id}
         />
       )}

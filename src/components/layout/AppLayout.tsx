@@ -1,11 +1,7 @@
 import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { AdminSidebar } from "@/components/admin/AdminSidebar";
 import { useUserRole } from "@/hooks/useUserRole";
-import { Button } from "@/components/ui/button";
-import { LogOut } from "lucide-react";
-import { supabase } from "@/integrations/supabase/client";
-import { toast } from "sonner";
-import { Logo } from "@/components/ui/logo";
+import { UniversalHeader } from "./UniversalHeader";
 
 interface AppLayoutProps {
   children: React.ReactNode;
@@ -13,17 +9,6 @@ interface AppLayoutProps {
 
 export default function AppLayout({ children }: AppLayoutProps) {
   const { isAdmin, loading } = useUserRole();
-
-  const handleSignOut = async () => {
-    try {
-      const { error } = await supabase.auth.signOut();
-      if (error) throw error;
-      toast.success("Signed out successfully");
-    } catch (error) {
-      console.error('Error signing out:', error);
-      toast.error('Error signing out');
-    }
-  };
 
   if (loading) {
     return (
@@ -39,13 +24,7 @@ export default function AppLayout({ children }: AppLayoutProps) {
   if (!isAdmin) {
     return (
       <div className="min-h-screen w-full">
-        <header className="h-16 flex items-center justify-between border-b px-4 bg-gradient-to-r from-primary/5 to-primary/10">
-          <Logo variant="full" />
-          <Button onClick={handleSignOut} variant="ghost" size="sm">
-            <LogOut className="h-4 w-4 mr-2" />
-            Sign Out
-          </Button>
-        </header>
+        <UniversalHeader />
         <main className="flex-1">
           {children}
         </main>
@@ -59,16 +38,10 @@ export default function AppLayout({ children }: AppLayoutProps) {
         <AdminSidebar />
         
         <div className="flex-1 flex flex-col">
-          <header className="h-16 flex items-center justify-between border-b px-4 bg-gradient-to-r from-primary/5 to-primary/10">
-            <div className="flex items-center gap-4">
-              <SidebarTrigger />
-              <Logo variant="full" />
-            </div>
-            <Button onClick={handleSignOut} variant="ghost" size="sm">
-              <LogOut className="h-4 w-4 mr-2" />
-              Sign Out
-            </Button>
-          </header>
+          <UniversalHeader 
+            showSidebarTrigger={true} 
+            sidebarTrigger={<SidebarTrigger />} 
+          />
           
           <main className="flex-1">
             {children}
