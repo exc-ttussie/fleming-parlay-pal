@@ -60,6 +60,7 @@ interface PlayerProp {
   description?: string;
   over_price?: number;
   under_price?: number;
+  yes_price?: number;
 }
 
 interface PlayerPropsData {
@@ -366,17 +367,65 @@ export const EnhancedCreateLegModal = ({
     
     if (!game.player_props) return options;
 
-      Object.entries(game.player_props).forEach(([category, markets]) => {
-        // Filter by selected category if one is selected
-        if (selectedCategory && selectedCategory !== 'all' && category !== selectedCategory) return;
+    // Add debugging for touchdown props specifically
+    console.log('=== DEBUGGING PLAYER PROPS ===');
+    console.log('Available categories:', Object.keys(game.player_props));
+    
+    // Check for touchdown category specifically
+    if (game.player_props['Touchdowns']) {
+      console.log('Found Touchdowns category');
+      const touchdownMarkets = Object.keys(game.player_props['Touchdowns']);
+      console.log('Available touchdown markets:', touchdownMarkets);
+      
+      if (game.player_props['Touchdowns']['player_anytime_td']) {
+        const anytimePlayers = Object.keys(game.player_props['Touchdowns']['player_anytime_td']);
+        console.log('Anytime TD players available:', anytimePlayers.length);
+        
+        // Check for Gibbs specifically
+        const gibbsOptions = anytimePlayers.filter(name => name.toLowerCase().includes('gibbs'));
+        if (gibbsOptions.length > 0) {
+          console.log('Found Gibbs anytime TD options:', gibbsOptions);
+          gibbsOptions.forEach(name => {
+            const prop = game.player_props['Touchdowns']['player_anytime_td'][name];
+            console.log(`${name} anytime TD:`, {
+              yes_price: prop.yes_price,
+              point: prop.point,
+              market_key: prop.market_key
+            });
+          });
+        } else {
+          console.log('No Gibbs found in anytime TD list');
+        }
+      }
+    } else {
+      console.log('No Touchdowns category found');
+    }
+
+    Object.entries(game.player_props).forEach(([category, markets]) => {
+      // Filter by selected category if one is selected
+      if (selectedCategory && selectedCategory !== 'all' && category !== selectedCategory) return;
 
       Object.entries(markets).forEach(([marketKey, players]) => {
         Object.entries(players).forEach(([playerName, prop]) => {
           // Filter by player search if search term exists
           if (playerSearch && !playerName.toLowerCase().includes(playerSearch.toLowerCase())) return;
 
+          // Handle Yes/No props (like anytime TD) - these have yes_price but no point
+          if (isValidPlayerPropPrice(prop.yes_price)) {
+            const description = `${playerName} ${formatPropName(marketKey)}`;
+            options.push({
+              type: 'player_prop',
+              selection: description,
+              odds: prop.yes_price,
+              line: null,
+              description,
+              player_name: playerName,
+              prop_type: marketKey,
+              prop_category: category
+            });
+          }
           // Handle Over/Under props with both prices
-          if (isValidLine(prop.point)) {
+          else if (isValidLine(prop.point)) {
             // Create both Over and Under options if available
             if (isValidPlayerPropPrice(prop.over_price)) {
               options.push({
@@ -418,8 +467,9 @@ export const EnhancedCreateLegModal = ({
                 prop_category: category
               });
             }
-          } else if (isValidPlayerPropPrice(prop.price)) {
-            // For props without points (like anytime TD)
+          } 
+          // Handle props without points but with main price (fallback for legacy data)
+          else if (isValidPlayerPropPrice(prop.price) && !prop.yes_price) {
             const description = `${playerName} ${formatPropName(marketKey)}`;
             options.push({
               type: 'player_prop',
@@ -436,6 +486,10 @@ export const EnhancedCreateLegModal = ({
         });
       });
     });
+
+    console.log(`=== TOTAL PLAYER PROP OPTIONS FOUND: ${options.length} ===`);
+    const gibbsOptions = options.filter(opt => opt.player_name?.toLowerCase().includes('gibbs'));
+    console.log(`=== GIBBS OPTIONS: ${gibbsOptions.length} ===`, gibbsOptions);
 
     return options.sort((a, b) => (a.player_name || '').localeCompare(b.player_name || ''));
   };

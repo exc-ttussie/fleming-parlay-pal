@@ -33,3 +33,7 @@ export function formatOdds(odds: number | null | undefined): string {
 export function isValidPlayerPropPrice(price: number | null | undefined): price is number {
   return isValidOdds(price);
 }
+
+export function isValidYesPrice(price: number | null | undefined): price is number {
+  return isValidOdds(price);
+}
