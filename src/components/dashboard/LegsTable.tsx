@@ -133,23 +133,30 @@ export const LegsTable = ({ legs, onRefresh }: LegsTableProps) => {
                   </div>
                 </TableCell>
                 <TableCell>
-                  <div>
+                  <div className="space-y-1">
                     {leg.player_name ? (
                       // Player prop: Show "Player Name - Prop Type: Selection"
-                      <div className="font-medium">
-                        {leg.player_name} - {leg.prop_type ? formatPropDisplayName(leg.prop_type) : 'Player Prop'}: {leg.selection}
-                      </div>
+                      <>
+                        <div className="font-medium text-foreground">
+                          {leg.player_name}
+                        </div>
+                        <div className="text-sm font-medium text-primary">
+                          {leg.prop_type ? formatPropDisplayName(leg.prop_type) : 'Player Prop'}: {leg.selection}
+                        </div>
+                      </>
                     ) : (
-                      // Game bet: Show selection normally
-                      <div className="font-medium">{leg.selection}</div>
+                      // Game bet: Show selection prominently
+                      <div className="font-medium text-primary text-base">
+                        {leg.selection}
+                      </div>
                     )}
                     {leg.prop_category && (
-                      <div className="text-sm text-muted-foreground">
+                      <div className="text-xs text-muted-foreground">
                         {leg.prop_category}
                       </div>
                     )}
                     {leg.line && (
-                      <div className="text-sm text-muted-foreground">
+                      <div className="text-sm font-medium text-foreground">
                         Line: {leg.line}
                       </div>
                     )}
