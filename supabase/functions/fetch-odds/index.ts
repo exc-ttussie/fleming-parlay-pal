@@ -86,22 +86,48 @@ const handler = async (req: Request): Promise<Response> => {
       
       const basicMarkets = 'h2h,spreads,totals';
       
-      // Player prop markets available in The Odds API - using correct market keys
+      // Player prop markets available in The Odds API - comprehensive list including all DraftKings markets
       const playerPropMarkets = [
+        // Passing props
         'player_pass_yds',
         'player_pass_tds', 
         'player_pass_completions',
         'player_pass_attempts',
         'player_pass_interceptions',
+        'player_pass_longest_completion',
+        
+        // Rushing props
         'player_rush_yds',
         'player_rush_attempts',
         'player_rush_tds',
+        'player_rush_longest',
+        
+        // Receiving props
         'player_receptions',
         'player_reception_yds',
         'player_reception_tds',
-        'player_anytime_td',
-        'player_1st_td',         // Fixed: was 'player_first_td'
-        'player_last_td'
+        'player_reception_longest',
+        
+        // Touchdown props (most important for user request)
+        'player_anytime_td',        // Anytime touchdown - CRITICAL
+        'player_1st_td',           // First touchdown
+        'player_last_td',          // Last touchdown
+        
+        // Defensive props
+        'player_sacks',
+        'player_tackles_assists',
+        'player_interceptions',
+        'player_fumbles_recovered',
+        
+        // Kicking props
+        'player_field_goals',
+        'player_kicking_points',
+        'player_extra_points',
+        
+        // Combined props
+        'player_pass_rush_reception_yds',  // Pass + Rush + Receiving yards
+        'player_rush_reception_yds',       // Rush + Receiving yards
+        'player_pass_reception_yds'        // Pass + Receiving yards
       ];
       
       // Fetch basic game data

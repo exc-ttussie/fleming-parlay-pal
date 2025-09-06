@@ -26,6 +26,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Search, User, BarChart3, Loader2, RefreshCw, TrendingUp } from 'lucide-react';
 import { americanToDecimal } from '@/lib/parlay';
 import { isValidOdds, isValidLine, isValidPlayerPropPrice, formatOdds } from '@/lib/oddsValidation';
+import { formatPropDisplayName } from '@/lib/propUtils';
 
 interface Game {
   id: string;
@@ -439,31 +440,8 @@ export const EnhancedCreateLegModal = ({
     return options.sort((a, b) => (a.player_name || '').localeCompare(b.player_name || ''));
   };
 
-  // Format prop names for display
-  const formatPropName = (marketKey: string): string => {
-    const formatMap: { [key: string]: string } = {
-      'player_pass_yds': 'Passing Yards',
-      'player_pass_tds': 'Passing TDs',
-      'player_pass_completions': 'Completions',
-      'player_pass_attempts': 'Pass Attempts',
-      'player_pass_interceptions': 'Interceptions',
-      'player_rush_yds': 'Rushing Yards',
-      'player_rush_tds': 'Rushing TDs',
-      'player_rush_attempts': 'Rush Attempts',
-      'player_receptions': 'Receptions',
-      'player_reception_yds': 'Receiving Yards',
-      'player_reception_tds': 'Receiving TDs',
-      'player_anytime_td': 'Anytime TD',
-      'player_1st_td': 'First TD',
-      'player_sacks': 'Sacks',
-      'player_tackles_assists': 'Tackles + Assists',
-      'player_field_goals': 'Field Goals',
-      'player_kicking_points': 'Kicking Points',
-      'player_pass_rush_reception_yds': 'Pass + Rush + Rec Yards',
-      'player_rush_reception_yds': 'Rush + Rec Yards'
-    };
-    return formatMap[marketKey] || marketKey.replace(/_/g, ' ');
-  };
+  // Use shared prop formatting utility
+  const formatPropName = formatPropDisplayName;
 
   // Get available categories for current game
   const getAvailableCategories = (game: Game): string[] => {

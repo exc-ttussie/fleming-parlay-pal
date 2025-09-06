@@ -9,6 +9,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { Leg } from '@/types/database';
 import { toast } from 'sonner';
 import { Check, X, AlertCircle, CheckSquare, Square, Filter } from 'lucide-react';
+import { formatPropDisplayName } from '@/lib/propUtils';
 
 interface LegWithProfile extends Leg {
   profiles?: { name: string; user_id: string } | null;
@@ -159,6 +160,7 @@ export const LegApproval = () => {
   useEffect(() => {
     fetchPendingLegs();
   }, [statusFilter]);
+
 
   const getStatusBadge = (status: string) => {
     const variants = {
@@ -312,14 +314,31 @@ export const LegApproval = () => {
                 </p>
               </CardHeader>
               <CardContent>
+                {/* Enhanced bet information display */}
+                <div className="bg-muted/30 p-4 rounded-lg mb-4">
+                  <div className="text-lg font-semibold mb-2">
+                    {leg.player_name ? (
+                      `${leg.player_name} - ${formatPropDisplayName(leg.prop_type || '')}`
+                    ) : (
+                      'Game Bet'
+                    )}
+                  </div>
+                  
+                  <div className="text-xl font-bold text-primary mb-1">
+                    {leg.selection}
+                  </div>
+                  
+                  {leg.prop_category && (
+                    <div className="text-sm text-muted-foreground">
+                      Category: {leg.prop_category}
+                    </div>
+                  )}
+                </div>
+
                 <div className="grid md:grid-cols-2 gap-4 mb-4">
                   <div>
-                    <p className="text-sm font-medium text-muted-foreground">Selection</p>
-                    <p>{leg.selection}</p>
-                  </div>
-                  <div>
                     <p className="text-sm font-medium text-muted-foreground">Market</p>
-                    <p>{leg.market_key}</p>
+                    <p>{formatPropDisplayName(leg.market_key)}</p>
                   </div>
                   <div>
                     <p className="text-sm font-medium text-muted-foreground">Odds</p>
@@ -338,6 +357,10 @@ export const LegApproval = () => {
                   <div>
                     <p className="text-sm font-medium text-muted-foreground">Source</p>
                     <p>{leg.source}</p>
+                  </div>
+                  <div>
+                    <p className="text-sm font-medium text-muted-foreground">League</p>
+                    <p>{leg.league}</p>
                   </div>
                 </div>
 

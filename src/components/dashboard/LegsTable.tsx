@@ -10,6 +10,7 @@ import { useAuthContext } from "@/components/AuthProvider";
 import { toast } from "sonner";
 import { Edit, Trash2, ExternalLink } from "lucide-react";
 import type { Leg } from "@/types/database";
+import { formatPropDisplayName } from "@/lib/propUtils";
 
 interface LegWithProfile extends Leg {
   profiles?: {
@@ -66,6 +67,7 @@ export const LegsTable = ({ legs, onRefresh }: LegsTableProps) => {
   const canDeleteLeg = (leg: LegWithProfile) => {
     return user?.id === leg.user_id && leg.status === 'PENDING';
   };
+
 
   const getStatusBadge = (status: string) => {
     switch (status) {
@@ -132,10 +134,18 @@ export const LegsTable = ({ legs, onRefresh }: LegsTableProps) => {
                 </TableCell>
                 <TableCell>
                   <div>
-                    <div className="font-medium">{leg.selection}</div>
-                    {leg.player_name && (
+                    {leg.player_name ? (
+                      // Player prop: Show "Player Name - Prop Type: Selection"
+                      <div className="font-medium">
+                        {leg.player_name} - {leg.prop_type ? formatPropDisplayName(leg.prop_type) : 'Player Prop'}: {leg.selection}
+                      </div>
+                    ) : (
+                      // Game bet: Show selection normally
+                      <div className="font-medium">{leg.selection}</div>
+                    )}
+                    {leg.prop_category && (
                       <div className="text-sm text-muted-foreground">
-                        {leg.player_name}
+                        {leg.prop_category}
                       </div>
                     )}
                     {leg.line && (
