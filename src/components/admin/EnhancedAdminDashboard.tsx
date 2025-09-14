@@ -3,9 +3,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { ConfirmationDialog } from '@/components/ui/confirmation-dialog';
 import { supabase } from '@/integrations/supabase/client';
-import { useToast } from '@/hooks/use-toast';
 import { 
   Users, 
   Shield, 
@@ -15,8 +13,7 @@ import {
   CheckCircle,
   XCircle,
   AlertTriangle,
-  Activity,
-  Trash2
+  Activity
 } from 'lucide-react';
 
 interface DashboardStats {
@@ -31,7 +28,6 @@ interface DashboardStats {
 }
 
 export const EnhancedAdminDashboard = () => {
-  const { toast } = useToast();
   const [stats, setStats] = useState<DashboardStats>({
     totalUsers: 0,
     pendingLegs: 0,
@@ -44,8 +40,6 @@ export const EnhancedAdminDashboard = () => {
   });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [showDeleteAllDialog, setShowDeleteAllDialog] = useState(false);
-  const [deleting, setDeleting] = useState(false);
 
   const fetchDashboardStats = async () => {
     try {
@@ -94,37 +88,6 @@ export const EnhancedAdminDashboard = () => {
       setError(error instanceof Error ? error.message : 'Failed to load dashboard data');
     } finally {
       setLoading(false);
-    }
-  };
-
-  const handleDeleteAllLegs = async () => {
-    try {
-      setDeleting(true);
-      
-      const { error } = await supabase
-        .from('legs')
-        .delete()
-        .neq('id', '00000000-0000-0000-0000-000000000000'); // Delete all legs
-      
-      if (error) throw error;
-      
-      toast({
-        title: "Success",
-        description: "All legs have been deleted successfully.",
-      });
-      
-      // Refresh dashboard stats
-      await fetchDashboardStats();
-      setShowDeleteAllDialog(false);
-    } catch (error) {
-      console.error('Error deleting all legs:', error);
-      toast({
-        title: "Error",
-        description: error instanceof Error ? error.message : "Failed to delete legs",
-        variant: "destructive",
-      });
-    } finally {
-      setDeleting(false);
     }
   };
 
@@ -346,41 +309,10 @@ export const EnhancedAdminDashboard = () => {
                   Refresh Data
                 </Button>
               </div>
-              
-              <div className="border-t pt-4">
-                <h4 className="font-medium text-destructive mb-3 flex items-center gap-2">
-                  <Trash2 className="h-4 w-4" />
-                  Dangerous Actions
-                </h4>
-                <Button 
-                  variant="destructive" 
-                  size="sm" 
-                  onClick={() => setShowDeleteAllDialog(true)}
-                  disabled={deleting}
-                  className="flex items-center gap-2"
-                >
-                  <Trash2 className="h-4 w-4" />
-                  {deleting ? 'Deleting...' : 'Delete All Legs'}
-                </Button>
-                <p className="text-xs text-muted-foreground mt-2">
-                  This will permanently delete all submitted legs from all users
-                </p>
-              </div>
             </TabsContent>
           </Tabs>
         </CardContent>
       </Card>
-
-      <ConfirmationDialog
-        open={showDeleteAllDialog}
-        onOpenChange={setShowDeleteAllDialog}
-        title="Delete All Legs"
-        description="Are you sure you want to delete ALL legs from ALL users? This action cannot be undone and will permanently remove all submitted bets."
-        confirmLabel="Delete All Legs"
-        cancelLabel="Cancel"
-        onConfirm={handleDeleteAllLegs}
-        variant="destructive"
-      />
     </div>
   );
 };
